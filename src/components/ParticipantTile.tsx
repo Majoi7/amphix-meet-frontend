@@ -6,7 +6,10 @@ import {
   useTrackMutedIndicator,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import type { TrackReferenceOrPlaceholder } from "@livekit/components-react";
+import type {
+  TrackReferenceOrPlaceholder,
+  TrackReference,
+} from "@livekit/components-react";
 
 interface ParticipantTileProps {
   trackRef: TrackReferenceOrPlaceholder;
@@ -31,28 +34,30 @@ export function ParticipantTile({
   const displayName = trackRef.participant.name || trackRef.participant.identity;
   const initials = displayName.trim().slice(0, 1).toUpperCase() || "?";
 
+  const containerClasses = [
+    "group relative overflow-hidden bg-meet-tile",
+    !isScreenShare && "aspect-video",
+    !isScreenShare && "rounded-tile",
+    isSpeaking && !isScreenShare && "ring-2 ring-meet-blue",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const videoClasses = [
+    "h-full w-full",
+    isScreenShare ? "object-contain" : "object-cover",
+    !isScreenShare && isLocal && "-scale-x-100",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div
-      className={[
-        "group relative overflow-hidden bg-meet-tile",
-        !isScreenShare && "aspect-video",
-        !isScreenShare && "rounded-tile",
-        isSpeaking && !isScreenShare && "ring-2 ring-meet-blue",
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
+    <div className={containerClasses}>
       {hasVideo ? (
         <VideoTrack
-          trackRef={trackRef}
-          className={[
-            "h-full w-full",
-            isScreenShare ? "object-contain" : "object-cover",
-            !isScreenShare && isLocal && "-scale-x-100",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+          trackRef={trackRef as TrackReference}
+          className={videoClasses}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
@@ -62,9 +67,10 @@ export function ParticipantTile({
         </div>
       )}
 
-      {!isLocal && <AudioTrack trackRef={trackRef} />}
+      {!isLocal && trackRef.publication && (
+        <AudioTrack trackRef={trackRef as TrackReference} />
+      )}
 
-      {/* Nom + micro (caché sur screen share) */}
       {!isScreenShare && (
         <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1">
           <span className="text-xs font-medium text-white sm:text-sm">
@@ -75,21 +81,18 @@ export function ParticipantTile({
         </div>
       )}
 
-      {/* Badge "Vous présentez" */}
       {isScreenShare && isLocal && (
         <div className="absolute top-3 left-3 z-10 rounded-md bg-meet-blue px-2.5 py-1 text-xs font-medium text-white">
           Vous présentez
         </div>
       )}
 
-      {/* Micro coupé en haut à droite (caméra uniquement) */}
       {!isScreenShare && isMuted && (
         <div className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-black/50">
           <MicOff size={12} className="text-white" />
         </div>
       )}
 
-      {/* Pin */}
       {trackRef.participant.isLocal && !isScreenShare && (
         <div className="absolute right-3 top-10 opacity-0 transition-opacity group-hover:opacity-100">
           <PinIcon size={14} className="text-white/70" />
