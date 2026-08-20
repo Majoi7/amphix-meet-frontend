@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-meet-bg text-meet-text-primary antialiased;
+  }
+
+  /* Focus clavier visible partout — accessibilité */
+  :focus-visible {
+    outline: 2px solid theme("colors.meet.blue");
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-color: theme("colors.meet.control") transparent;
+    scrollbar-width: thin;
+  }
+}
+
+@layer components {
+  /* Bouton de contrôle rond (micro, caméra, etc.) — signature visuelle de Meet */
+  .control-btn {
+    @apply flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full
+      bg-meet-control text-meet-text-primary transition-colors duration-150
+      hover:bg-meet-control-hover disabled:opacity-40 disabled:cursor-not-allowed
+      sm:h-12 sm:w-12;
+  }
+
+  .control-btn-active {
+    @apply bg-meet-red hover:bg-meet-red-hover;
+  }
+
+  .control-btn-danger {
+    @apply bg-meet-red text-white hover:bg-meet-red-hover;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
