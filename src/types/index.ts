@@ -22,3 +22,14 @@ export interface ChatMessage {
   timestamp: number;
   isLocal: boolean;
 }
+
+export type UserRole = "STUDENT" | "TEACHER" | "ADMIN";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl: string | null;
+  role: UserRole;
+  emailVerified: boolean;
+}
