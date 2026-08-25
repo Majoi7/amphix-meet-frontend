@@ -33,16 +33,26 @@ export function Register() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-meet-bg px-4 py-10">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-meet-bg px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute left-1/2 top-1/4 h-96 w-96 -translate-x-1/2 rounded-full bg-meet-blue/20 blur-[130px]" />
+        <div className="absolute bottom-0 left-1/4 h-72 w-72 rounded-full bg-meet-green/10 blur-[110px]" />
+      </div>
+
       <div className="w-full max-w-sm animate-slide-up">
         <div className="mb-8 flex items-center justify-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-meet-blue">
-            <Video size={24} className="text-meet-bg" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-meet-blue to-meet-pink shadow-glow transition-transform duration-300 ease-fluid hover:rotate-6 hover:scale-105">
+            <Video size={24} className="text-white" />
           </div>
-          <h1 className="text-2xl font-medium text-meet-text-primary">Amphix Meet</h1>
+          <h1 className="bg-gradient-to-r from-white to-meet-text-secondary bg-clip-text text-2xl font-medium text-transparent">
+            Amphix Meet
+          </h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4 rounded-2xl border border-meet-border/60 bg-meet-bg-secondary/40 p-6 shadow-panel backdrop-blur-sm sm:p-7"
+        >
           <div>
             <label htmlFor="name" className="mb-1.5 block text-sm text-meet-text-secondary">
               Nom complet
@@ -55,7 +65,7 @@ export function Register() {
               maxLength={100}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-meet-blue"
+              className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary transition-all duration-200 ease-fluid focus:outline-none focus-visible:border-meet-blue focus-visible:shadow-glow focus-visible:ring-2 focus-visible:ring-meet-blue/40"
             />
           </div>
 
@@ -69,7 +79,7 @@ export function Register() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-meet-blue"
+              className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary transition-all duration-200 ease-fluid focus:outline-none focus-visible:border-meet-blue focus-visible:shadow-glow focus-visible:ring-2 focus-visible:ring-meet-blue/40"
             />
           </div>
 
@@ -84,21 +94,21 @@ export function Register() {
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-meet-blue"
+              className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary transition-all duration-200 ease-fluid focus:outline-none focus-visible:border-meet-blue focus-visible:shadow-glow focus-visible:ring-2 focus-visible:ring-meet-blue/40"
             />
             <p className="mt-1 text-xs text-meet-text-disabled">8 caractères minimum</p>
           </div>
 
           <div>
             <span className="mb-1.5 block text-sm text-meet-text-secondary">Je suis…</span>
-            <div className="flex gap-2">
+            <div className="flex gap-2 rounded-lg border border-meet-border bg-meet-bg-secondary p-1">
               <button
                 type="button"
                 onClick={() => setRole("STUDENT")}
-                className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
+                className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-200 ease-fluid ${
                   role === "STUDENT"
-                    ? "border-meet-blue bg-meet-blue/10 text-meet-blue"
-                    : "border-meet-border text-meet-text-secondary hover:bg-meet-bg-secondary"
+                    ? "bg-gradient-to-r from-meet-blue to-meet-pink text-white shadow-glow"
+                    : "text-meet-text-secondary hover:bg-meet-control hover:text-meet-text-primary"
                 }`}
               >
                 Étudiant
@@ -106,10 +116,10 @@ export function Register() {
               <button
                 type="button"
                 onClick={() => setRole("TEACHER")}
-                className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
+                className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-200 ease-fluid ${
                   role === "TEACHER"
-                    ? "border-meet-blue bg-meet-blue/10 text-meet-blue"
-                    : "border-meet-border text-meet-text-secondary hover:bg-meet-bg-secondary"
+                    ? "bg-gradient-to-r from-meet-blue to-meet-pink text-white shadow-glow"
+                    : "text-meet-text-secondary hover:bg-meet-control hover:text-meet-text-primary"
                 }`}
               >
                 Enseignant
@@ -120,14 +130,14 @@ export function Register() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-meet-blue px-6 py-3 text-sm font-medium text-meet-bg transition-colors hover:bg-meet-blue-hover disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-meet-blue to-meet-pink bg-[length:200%_100%] bg-left px-6 py-3 text-sm font-medium text-white shadow-glow transition-all duration-300 ease-fluid hover:scale-[1.02] hover:bg-right active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
           >
             {isSubmitting && <Loader2 size={18} className="animate-spin" />}
             Créer mon compte
           </button>
 
           {error && (
-            <p role="alert" className="text-center text-sm text-meet-yellow">
+            <p role="alert" className="animate-slide-down text-center text-sm text-meet-yellow">
               {error}
             </p>
           )}
@@ -135,7 +145,10 @@ export function Register() {
 
         <p className="mt-6 text-center text-sm text-meet-text-secondary">
           Déjà un compte ?{" "}
-          <Link to="/login" className="text-meet-blue hover:underline">
+          <Link
+            to="/login"
+            className="font-medium text-meet-blue-soft transition-colors duration-200 hover:text-meet-blue hover:underline"
+          >
             Se connecter
           </Link>
         </p>

@@ -1,5 +1,6 @@
 import { Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { useMediaPreview } from "../hooks/useMediaDevices";
+import { getAvatarColor } from "../lib/avatarColor";
 
 interface DevicePreviewProps {
   displayName: string;
@@ -40,7 +41,10 @@ export function DevicePreview({ displayName, onDeviceStateChange }: DevicePrevie
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-meet-blue text-2xl font-medium text-meet-bg">
+            <div
+              className="flex h-20 w-20 items-center justify-center rounded-full text-2xl font-medium text-meet-bg"
+              style={{ backgroundColor: getAvatarColor(displayName) }}
+            >
               {initials}
             </div>
           </div>

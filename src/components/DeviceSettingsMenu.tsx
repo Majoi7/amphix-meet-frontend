@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronUp, Mic, Video } from "lucide-react";
+import { Check, ChevronUp, Mic, Speaker, Video } from "lucide-react";
 import { useMediaDeviceSelect } from "@livekit/components-react";
 
 interface DeviceSettingsMenuProps {
@@ -7,16 +7,19 @@ interface DeviceSettingsMenuProps {
 }
 
 /**
- * Menu permettant de changer de caméra ou de micro en cours de réunion
- * (utile sur un ordinateur portable avec plusieurs webcams/casques
- * branchés). S'ouvre au-dessus du bouton qui le déclenche.
+ * Menu permettant de changer de caméra, micro ou haut-parleur en cours de
+ * réunion. Le haut-parleur (audiooutput) n'est pas supporté par tous les
+ * navigateurs (Safari notamment ne permet pas de changer la sortie audio
+ * via l'API Web) — dans ce cas la liste est simplement vide, avec un
+ * message explicite plutôt qu'un onglet cassé.
  */
 export function DeviceSettingsMenu({ onClose }: DeviceSettingsMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<"camera" | "microphone">("camera");
+  const [tab, setTab] = useState<"camera" | "microphone" | "speaker">("camera");
 
   const cameraSelect = useMediaDeviceSelect({ kind: "videoinput" });
   const micSelect = useMediaDeviceSelect({ kind: "audioinput" });
+  const speakerSelect = useMediaDeviceSelect({ kind: "audiooutput" });
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -28,7 +31,8 @@ export function DeviceSettingsMenu({ onClose }: DeviceSettingsMenuProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
-  const activeDevices = tab === "camera" ? cameraSelect : micSelect;
+  const activeDevices =
+    tab === "camera" ? cameraSelect : tab === "microphone" ? micSelect : speakerSelect;
 
   return (
     <div
@@ -58,12 +62,25 @@ export function DeviceSettingsMenu({ onClose }: DeviceSettingsMenuProps) {
         >
           <Mic size={14} /> Micro
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("speaker")}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+            tab === "speaker"
+              ? "bg-meet-control text-meet-text-primary"
+              : "text-meet-text-secondary hover:bg-meet-control"
+          }`}
+        >
+          <Speaker size={14} /> Sortie
+        </button>
       </div>
 
       <ul className="max-h-48 overflow-y-auto">
         {activeDevices.devices.length === 0 && (
           <li className="px-3 py-2 text-xs text-meet-text-secondary">
-            Aucun appareil détecté.
+            {tab === "speaker"
+              ? "Ton navigateur ne permet pas de choisir la sortie audio."
+              : "Aucun appareil détecté."}
           </li>
         )}
         {activeDevices.devices.map((device) => (

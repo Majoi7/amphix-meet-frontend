@@ -10,7 +10,6 @@ export interface TokenResponse {
 }
 
 export interface DevicePreferences {
-  participantName: string;
   micEnabled: boolean;
   cameraEnabled: boolean;
 }

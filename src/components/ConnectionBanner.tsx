@@ -1,61 +1,85 @@
-import { useEffect, useState } from "react";
-import { ConnectionState } from "livekit-client";
-import { useConnectionState } from "@livekit/components-react";
-import { Loader2, WifiOff } from "lucide-react";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
 
 /**
- * Bannière discrète en haut de l'écran quand la connexion se dégrade ou se
- * rétablit. LiveKit gère la reconnexion automatique en interne — ce
- * composant se contente de rendre cet état visible pour l'utilisateur,
- * pour qu'il ne pense pas que l'appli est cassée.
+ * Bannière de connectivité Internet — imposante et responsive.
+ * Desktop : grande pill flottante centrée.
+ * Mobile  : barre pleine largeur en haut avec bordure colorée.
  */
 export function ConnectionBanner() {
-  const state = useConnectionState();
-  const [showReconnected, setShowReconnected] = useState(false);
-  const [wasDisconnected, setWasDisconnected] = useState(false);
+  const { isOnline, showRestored } = useNetworkStatus();
 
-  useEffect(() => {
-    if (state === ConnectionState.Reconnecting || state === ConnectionState.Disconnected) {
-      setWasDisconnected(true);
-    } else if (state === ConnectionState.Connected && wasDisconnected) {
-      setShowReconnected(true);
-      setWasDisconnected(false);
-      const timeout = setTimeout(() => setShowReconnected(false), 3000);
-      return () => clearTimeout(timeout);
-    }
-  }, [state, wasDisconnected]);
-
-  if (state === ConnectionState.Reconnecting) {
+  // ═════ HORS LIGNE ═════
+  if (!isOnline) {
     return (
-      <div
-        role="status"
-        className="flex items-center justify-center gap-2 bg-meet-yellow px-4 py-2 text-sm font-medium text-meet-bg animate-fade-in"
-      >
-        <Loader2 size={16} className="animate-spin" />
-        Reconnexion en cours… vos flux audio/vidéo peuvent être coupés momentanément.
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] animate-slide-down">
+        {/* Mobile : barre pleine largeur */}
+        <div className="flex items-center justify-center gap-3 border-t-2 border-red-500/40 bg-[#0a0a0a]/95 px-5 py-4 shadow-2xl backdrop-blur-xl sm:hidden">
+          <span className="relative flex h-5 w-5 items-center justify-center">
+            <span className="absolute h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse-dot" />
+          </span>
+          <span className="text-base font-semibold tracking-wide text-white">
+            Connexion Internet perdue
+          </span>
+        </div>
+
+        {/* Desktop : grande pill flottante */}
+        <div className="hidden sm:flex sm:justify-center sm:px-6 sm:pt-5">
+          <div className="flex items-center gap-4 rounded-full border border-red-500/20 bg-[#0a0a0a]/90 px-10 py-4 shadow-2xl backdrop-blur-xl">
+            <span className="relative flex h-6 w-6 items-center justify-center">
+              <span className="absolute h-3 w-3 rounded-full bg-red-500 animate-pulse-dot" />
+            </span>
+            <span className="text-lg font-semibold tracking-wide text-white">
+              Connexion Internet perdue
+            </span>
+          </div>
+        </div>
       </div>
     );
   }
 
-  if (state === ConnectionState.Disconnected) {
+  // ═════ RÉTABLIE (toast temporaire) ═════
+  if (showRestored) {
     return (
-      <div
-        role="alert"
-        className="flex items-center justify-center gap-2 bg-meet-red px-4 py-2 text-sm font-medium text-white animate-fade-in"
-      >
-        <WifiOff size={16} />
-        Connexion perdue. Nouvelle tentative en cours…
-      </div>
-    );
-  }
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] animate-slide-down">
+        {/* Mobile */}
+        <div className="flex items-center justify-center gap-3 border-t-2 border-blue-500/40 bg-[#0a0a0a]/95 px-5 py-4 shadow-2xl backdrop-blur-xl sm:hidden">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#3b82f6"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span className="text-base font-semibold tracking-wide text-white">
+            Connexion rétablie
+          </span>
+        </div>
 
-  if (showReconnected) {
-    return (
-      <div
-        role="status"
-        className="flex items-center justify-center gap-2 bg-meet-green px-4 py-2 text-sm font-medium text-white animate-fade-in"
-      >
-        Connexion rétablie.
+        {/* Desktop */}
+        <div className="hidden sm:flex sm:justify-center sm:px-6 sm:pt-5">
+          <div className="flex items-center gap-4 rounded-full border border-blue-500/20 bg-[#0a0a0a]/90 px-10 py-4 shadow-2xl backdrop-blur-xl">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span className="text-lg font-semibold tracking-wide text-white">
+              Connexion rétablie
+            </span>
+          </div>
+        </div>
       </div>
     );
   }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Loader2, Video } from "lucide-react";
 import { DevicePreview } from "../components/DevicePreview";
+import { useAuth } from "../context/AuthContext";
 import type { DevicePreferences } from "../types";
 
 interface PreJoinProps {
@@ -11,14 +12,14 @@ interface PreJoinProps {
 }
 
 /**
- * Écran affiché avant d'entrer dans la réunion : nom, aperçu caméra/micro,
- * puis bouton "Rejoindre". Sépare volontairement le choix du nom et des
- * appareils de la logique de connexion à LiveKit (dans Room.tsx).
+ * Écran affiché avant d'entrer dans la réunion : aperçu caméra/micro, puis
+ * bouton "Rejoindre". Phase 2 — le nom vient maintenant du compte
+ * authentifié (plus de saisie manuelle, tout le monde est connecté).
  */
 export function PreJoin({ onJoin, isJoining, error }: PreJoinProps) {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const [name, setName] = useState("");
+  const { user } = useAuth();
   const [deviceState, setDeviceState] = useState({ micEnabled: true, cameraEnabled: true });
 
   if (!roomId) {
@@ -28,48 +29,54 @@ export function PreJoin({ onJoin, isJoining, error }: PreJoinProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    await onJoin({ participantName: trimmed, ...deviceState });
+    await onJoin(deviceState);
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-meet-bg px-4 py-10 lg:flex-row lg:gap-16">
-      <DevicePreview displayName={name} onDeviceStateChange={setDeviceState} />
+    <div className="relative flex min-h-screen flex-col items-center justify-center gap-8 overflow-hidden bg-meet-bg px-4 py-10 lg:flex-row lg:gap-16">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute left-1/4 top-0 h-96 w-96 rounded-full bg-meet-blue/15 blur-[130px]" />
+        <div className="absolute bottom-0 right-1/4 h-80 w-80 rounded-full bg-meet-green/10 blur-[120px]" />
+      </div>
 
-      <form onSubmit={handleSubmit} className="w-full max-w-sm animate-slide-up">
+      <div className="animate-scale-in">
+        <DevicePreview
+          displayName={user?.name ?? ""}
+          onDeviceStateChange={setDeviceState}
+        />
+      </div>
+
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-sm animate-slide-up rounded-2xl border border-meet-border/60 bg-meet-bg-secondary/40 p-6 shadow-panel backdrop-blur-sm"
+      >
         <div className="mb-6 flex items-center gap-2">
-          <Video size={20} className="text-meet-blue" />
+          <Video size={20} className="text-meet-blue-soft" />
           <span className="text-sm text-meet-text-secondary">
-            Prêt à rejoindre <span className="font-mono text-meet-text-primary">{roomId}</span> ?
+            Prêt à rejoindre{" "}
+            <span className="rounded-md bg-meet-bg-secondary px-1.5 py-0.5 font-mono text-meet-text-primary">
+              {roomId}
+            </span>{" "}
+            ?
           </span>
         </div>
 
-        <label htmlFor="participant-name" className="mb-1.5 block text-sm text-meet-text-secondary">
-          Votre nom
-        </label>
-        <input
-          id="participant-name"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="ex. Jehovaly"
-          maxLength={50}
-          autoFocus
-          className="mb-4 w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-meet-blue"
-        />
+        <p className="mb-4 text-sm text-meet-text-secondary">
+          Connecté en tant que{" "}
+          <span className="font-medium text-meet-text-primary">{user?.name}</span>
+        </p>
 
         <button
           type="submit"
-          disabled={!name.trim() || isJoining}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-meet-green px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-meet-green-hover disabled:opacity-50"
+          disabled={isJoining}
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-meet-green to-meet-blue bg-[length:200%_100%] bg-left px-6 py-3 text-sm font-medium text-white shadow-glow-green transition-all duration-300 ease-fluid hover:scale-[1.02] hover:bg-right active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
         >
           {isJoining && <Loader2 size={18} className="animate-spin" />}
           Rejoindre
         </button>
 
         {error && (
-          <p role="alert" className="mt-4 text-center text-sm text-meet-yellow">
+          <p role="alert" className="mt-4 animate-slide-down text-center text-sm text-meet-yellow">
             {error}
           </p>
         )}
