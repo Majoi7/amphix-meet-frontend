@@ -25,9 +25,6 @@ interface MeetControlsProps {
   onLeave: () => void;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   Icône Material Symbols Rounded
-   ═══════════════════════════════════════════════════════════════ */
 function Icon({
   name,
   filled = false,
@@ -46,9 +43,6 @@ function Icon({
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   Hook temps écoulé
-   ═══════════════════════════════════════════════════════════════ */
 function useElapsed(start: number) {
   const [elapsed, setElapsed] = useState("00:00");
   useEffect(() => {
@@ -102,7 +96,6 @@ export function MeetControls({
 
   const elapsed = useElapsed(meetingStartTime);
 
-  /* Fermer le menu "⋯" au clic extérieur */
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
@@ -145,9 +138,7 @@ export function MeetControls({
         <DeviceSettingsMenu onClose={() => setOpenDeviceMenu("none")} />
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════
-          GAUCHE — Temps + badge mains levées
-          ═══════════════════════════════════════════════════════════════ */}
+      {/* GAUCHE — Temps + badge mains levées */}
       <div className="pointer-events-auto flex w-20 items-center gap-2 sm:w-32">
         <span className="text-xs font-medium text-white/70 tabular-nums sm:text-sm">
           {elapsed}
@@ -160,9 +151,7 @@ export function MeetControls({
         )}
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════
-          CENTRE — Contrôles principaux (touch-friendly)
-          ═══════════════════════════════════════════════════════════════ */}
+      {/* CENTRE — Micro, Caméra, Main levée, Déconnexion */}
       <div className="pointer-events-auto flex flex-1 items-center justify-center gap-2 sm:gap-3">
         {/* Micro */}
         <div className="relative">
@@ -218,23 +207,6 @@ export function MeetControls({
           </div>
         </div>
 
-        {/* Partage d'écran */}
-        <button
-          type="button"
-          onClick={() => screenShareToggle.toggle()}
-          className={`flex h-11 w-11 items-center justify-center rounded-full text-white transition-all sm:h-12 sm:w-12 ${
-            isScreenShareEnabled
-              ? "bg-[#8ab4f8] text-black hover:bg-[#aecbfa]"
-              : "bg-white/10 hover:bg-white/20"
-          }`}
-        >
-          <Icon
-            name={isScreenShareEnabled ? "stop_screen_share" : "present_to_all"}
-            filled={isScreenShareEnabled}
-            className="text-[20px] sm:text-[22px]"
-          />
-        </button>
-
         {/* Main levée */}
         <button
           type="button"
@@ -248,7 +220,7 @@ export function MeetControls({
           <Icon name="back_hand" filled={isHandRaised} className="text-[20px] sm:text-[22px]" />
         </button>
 
-        {/* Quitter (toujours visible, bien visible) */}
+        {/* Déconnexion */}
         <button
           type="button"
           onClick={onLeave}
@@ -258,29 +230,8 @@ export function MeetControls({
         </button>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════
-          DROITE — Participants, Chat, ⋯ (plus d'options)
-          ═══════════════════════════════════════════════════════════════ */}
-      <div className="pointer-events-auto flex w-auto items-center justify-end gap-1.5 sm:w-40 sm:gap-2">
-        {/* Participants */}
-        <button
-          type="button"
-          onClick={onToggleParticipants}
-          className={`relative flex h-10 w-10 items-center justify-center rounded-full text-white transition-colors sm:h-11 sm:w-11 ${
-            isParticipantsOpen
-              ? "bg-[#8ab4f8] text-black"
-              : "bg-white/10 hover:bg-white/20"
-          }`}
-        >
-          <Icon name="group" filled={isParticipantsOpen} className="text-[18px] sm:text-[20px]" />
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#1a1a1a] px-1 text-[9px] font-medium text-white ring-1 ring-white/20">
-            {participantCount}
-          </span>
-          {pendingLobbyCount > 0 && (
-            <span className="absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 rounded-full bg-yellow-500 ring-1 ring-black" />
-          )}
-        </button>
-
+      {/* DROITE — Chat, ⋯ (menu) */}
+      <div className="pointer-events-auto flex w-auto items-center justify-end gap-1.5 sm:w-auto sm:gap-2">
         {/* Chat */}
         <button
           type="button"
@@ -299,22 +250,62 @@ export function MeetControls({
           )}
         </button>
 
-        {/* ⋯ Plus d'options (whiteboard, plein écran, inviter) */}
+        {/* ⋯ Plus d'options */}
         <div className="relative" ref={moreRef}>
           <button
             type="button"
             onClick={() => setShowMore((v) => !v)}
             className={`flex h-10 w-10 items-center justify-center rounded-full text-white transition-colors sm:h-11 sm:w-11 ${
-              showMore
-                ? "bg-white/20"
-                : "bg-white/10 hover:bg-white/20"
+              showMore ? "bg-white/20" : "bg-white/10 hover:bg-white/20"
             }`}
           >
             <Icon name="more_vert" className="text-[20px] sm:text-[22px]" />
           </button>
 
           {showMore && (
-            <div className="absolute bottom-full right-0 mb-2 w-72 rounded-2xl bg-[#1a1a1a] p-3 shadow-2xl ring-1 ring-white/10">
+            <div className="absolute bottom-full right-0 mb-2 w-72 rounded-2xl bg-[#1a1a1a] p-2 shadow-2xl ring-1 ring-white/10">
+              {/* Partage d'écran */}
+              <button
+                type="button"
+                onClick={() => {
+                  screenShareToggle.toggle();
+                  setShowMore(false);
+                }}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-white transition-colors hover:bg-white/5 ${
+                  isScreenShareEnabled ? "bg-white/5" : ""
+                }`}
+              >
+                <Icon
+                  name={isScreenShareEnabled ? "stop_screen_share" : "present_to_all"}
+                  filled={isScreenShareEnabled}
+                  className="text-[20px]"
+                />
+                <span>
+                  {isScreenShareEnabled ? "Arrêter le partage" : "Partager l'écran"}
+                </span>
+              </button>
+
+              {/* Participants */}
+              <button
+                type="button"
+                onClick={() => {
+                  onToggleParticipants();
+                  setShowMore(false);
+                }}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-white transition-colors hover:bg-white/5 ${
+                  isParticipantsOpen ? "bg-white/5" : ""
+                }`}
+              >
+                <Icon name="group" filled={isParticipantsOpen} className="text-[20px]" />
+                <span>Participants</span>
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-white/10 px-1.5 text-[10px] font-medium text-white/70">
+                  {participantCount}
+                </span>
+                {pendingLobbyCount > 0 && (
+                  <span className="absolute right-5 h-2 w-2 rounded-full bg-yellow-500" />
+                )}
+              </button>
+
               {/* Whiteboard */}
               <button
                 type="button"
