@@ -44,7 +44,10 @@ export function useHandRaise() {
       name: localParticipant?.name || localParticipant?.identity || "Anonyme",
       raised: next,
     };
-    send(new TextEncoder().encode(JSON.stringify(payload)));
+    send(
+  new TextEncoder().encode(JSON.stringify(payload)),
+  { reliable: true }
+);
   }, [isHandRaised, localParticipant, send]);
 
   return { raisedHands, isHandRaised, toggleHand };

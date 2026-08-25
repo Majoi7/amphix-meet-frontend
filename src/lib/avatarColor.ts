@@ -20,9 +20,7 @@ const AVATAR_PALETTE = [
 export function getAvatarColor(identity: string): string {
   let hash = 0;
   for (let i = 0; i < identity.length; i++) {
-    hash = (hash << 5) - hash + identity.charCodeAt(i);
-    hash |= 0; // force un entier 32 bits
+    hash = identity.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const index = Math.abs(hash) % AVATAR_PALETTE.length;
-  return AVATAR_PALETTE[index];
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 }
