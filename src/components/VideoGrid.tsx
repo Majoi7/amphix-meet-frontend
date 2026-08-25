@@ -168,7 +168,7 @@ export function VideoGrid() {
   if (count === 1) {
     return (
       <div className="flex h-full w-full items-center justify-center p-6 sm:p-10">
-        <div className="relative w-full max-w-5xl overflow-hidden rounded-[2rem] bg-meet-tile shadow-2xl aspect-video">
+        <div className="relative w-full max-w-3xl overflow-hidden rounded-[2rem] bg-meet-tile shadow-2xl aspect-video">
           <ParticipantTile
             trackRef={sortedTracks[0]}
             isLocal={sortedTracks[0].participant.isLocal}
