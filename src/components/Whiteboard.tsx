@@ -5,6 +5,7 @@ import {
   Minus,
   Pencil,
   Redo2,
+  Sigma,
   Square,
   Trash2,
   Undo2,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { useDataChannel, useLocalParticipant } from "@livekit/components-react";
 import { getWhiteboard, saveWhiteboard } from "../lib/whiteboardApi";
+import { MathPanel } from "./MathPanel";
 import type {
   WhiteboardPoint,
   WhiteboardStroke,
@@ -57,6 +59,7 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
   const [color, setColor] = useState(COLORS[0]);
   const [width, setWidth] = useState(WIDTHS[1]);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isMathPanelOpen, setIsMathPanelOpen] = useState(false);
   const currentStrokeRef = useRef<WhiteboardStroke | null>(null);
   const [, forceRender] = useState(0);
 
@@ -184,6 +187,19 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
     draw();
   }
 
+  /** Ajoute un ou plusieurs traits d'un coup — utilisé par le dessin
+   * normal (1 trait) et par le panneau maths (plusieurs segments d'une
+   * même fonction, ou les 2 traits des axes). */
+  function commitStrokes(newStrokes: WhiteboardStroke[]) {
+    if (newStrokes.length === 0) return;
+    setStrokes((prev) => [...prev, ...newStrokes]);
+    for (const s of newStrokes) {
+      undoStackRef.current.push(s.id);
+      broadcast({ type: "stroke", stroke: s });
+    }
+    redoStackRef.current = [];
+  }
+
   function handlePointerUp() {
     const stroke = currentStrokeRef.current;
     currentStrokeRef.current = null;
@@ -193,10 +209,7 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
     const isShapeTool = stroke.tool !== "pencil" && stroke.tool !== "eraser";
     if (isShapeTool && stroke.points.length < 2) return; // clic sans glisser — ignoré
 
-    setStrokes((prev) => [...prev, stroke]);
-    undoStackRef.current.push(stroke.id);
-    redoStackRef.current = [];
-    broadcast({ type: "stroke", stroke });
+    commitStrokes([stroke]);
   }
 
   function handleUndo() {
@@ -245,6 +258,13 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
         </ToolButton>
         <ToolButton active={tool === "circle"} onClick={() => setTool("circle")} label="Cercle">
           <CircleIcon size={16} />
+        </ToolButton>
+        <ToolButton
+          active={isMathPanelOpen}
+          onClick={() => setIsMathPanelOpen((v) => !v)}
+          label="Fonction f(x)"
+        >
+          <Sigma size={16} />
         </ToolButton>
 
         <div className="mx-1 h-6 w-px bg-meet-border" />
@@ -306,6 +326,15 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
       </div>
 
       <div ref={containerRef} className="relative min-h-0 flex-1">
+        {isMathPanelOpen && (
+          <MathPanel
+            authorId={localParticipant.identity}
+            color={color}
+            width={width}
+            onPlot={(newStrokes) => commitStrokes(newStrokes)}
+            onClose={() => setIsMathPanelOpen(false)}
+          />
+        )}
         <canvas
           ref={canvasRef}
           onPointerDown={handlePointerDown}
@@ -333,7 +362,7 @@ function drawStroke(
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  if (stroke.tool === "pencil" || stroke.tool === "eraser") {
+  if (stroke.tool === "pencil" || stroke.tool === "eraser" || stroke.tool === "function") {
     if (stroke.points.length < 2) return;
     ctx.beginPath();
     const start = toPixel(stroke.points[0]);

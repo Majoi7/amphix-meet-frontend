@@ -3,7 +3,7 @@ export interface WhiteboardPoint {
   y: number;
 }
 
-export type WhiteboardTool = "pencil" | "eraser" | "line" | "rectangle" | "circle";
+export type WhiteboardTool = "pencil" | "eraser" | "line" | "rectangle" | "circle" | "function";
 
 export interface WhiteboardStroke {
   id: string;

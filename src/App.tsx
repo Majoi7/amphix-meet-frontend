@@ -3,37 +3,44 @@ import { AuthProvider } from "./context/AuthContext";
 import { RequireAuth } from "./components/RequireAuth";
 import { Home } from "./pages/Home";
 import { RoomPage } from "./pages/Room";
+import { EmbedRoomPage } from "./pages/EmbedRoom";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 
 export function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          {/* Routes publiques */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+      <Routes>
+        <Route path="/embed/room/:roomId" element={<EmbedRoomPage />} />
 
-          {/* Routes protégées — redirigent vers /login si non authentifié */}
-          <Route
-            path="/"
-            element={
-              <RequireAuth>
-                <Home />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/room/:roomId"
-            element={
-              <RequireAuth>
-                <RoomPage />
-              </RequireAuth>
-            }
-          />
-        </Routes>
-      </AuthProvider>
+        <Route
+          path="/*"
+          element={
+            <AuthProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route
+                  path="/"
+                  element={
+                    <RequireAuth>
+                      <Home />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/room/:roomId"
+                  element={
+                    <RequireAuth>
+                      <RoomPage />
+                    </RequireAuth>
+                  }
+                />
+              </Routes>
+            </AuthProvider>
+          }
+        />
+      </Routes>
     </BrowserRouter>
   );
 }
