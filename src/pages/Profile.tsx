@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ArrowLeft, Loader2, Check } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { getAvatarColor } from "../lib/avatarColor";
@@ -12,7 +12,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export function Profile() {
   const { user, updateProfile } = useAuth();
-  const navigate = useNavigate();
+  //const navigate = useNavigate();
   const [name, setName] = useState(user?.name ?? "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
   const [isSaving, setIsSaving] = useState(false);
