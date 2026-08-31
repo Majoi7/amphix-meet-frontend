@@ -25,7 +25,9 @@ import { useHandRaise } from "../hooks/useHandRaise";
 import { useHandRaiseSound } from "../hooks/useHandRaiseSound";
 import type { DevicePreferences } from "../types";
 import { ConnectionBanner } from "../components/ConnectionBanner";
-
+import { useReactions } from "../hooks/useReactions";
+import { ReactionOverlay } from "../components/ReactionOverlay";
+import { useIsMobile } from "../hooks/useIsMobile";
 type PanelState = "none" | "chat" | "participants";
 const LOBBY_POLL_INTERVAL_MS = 3000;
 
@@ -186,12 +188,19 @@ function MeetingLayoutInner({ roomId, isHost, onLeave }: MeetingLayoutProps) {
   const [lastReadCount, setLastReadCount] = useState(0);
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
   const [meetingStartTime] = useState(() => Date.now());
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const handleScreenTap = () => {
+  setControlsVisible(prev => !prev);
+};
   const participants = useParticipants();
   const { chatMessages } = useChat();
   const { requests: lobbyRequests, refresh: refreshLobby } = useLobbyRequests(roomId, isHost);
 
+// Dans ton composant :
   const { raisedHands, isHandRaised, toggleHand } = useHandRaise();
   const playHandSound = useHandRaiseSound();
+  const { reactions, sendReaction } = useReactions();
+  const isMobile = useIsMobile();
 
   const handleToggleHand = () => {
     toggleHand();
@@ -218,9 +227,12 @@ function MeetingLayoutInner({ roomId, isHost, onLeave }: MeetingLayoutProps) {
        {/* Bannière de connexion (reconnexion, perdue, rétablie) */}
       <ConnectionBanner />
 
-      <div className="flex min-h-0 flex-1 overflow-hidden pb-16 sm:pb-20">
-        <main className="relative min-w-0 flex-1 overflow-hidden">
-          {isWhiteboardOpen ? (
+<div className={`flex min-h-0 flex-1 overflow-hidden ${isMobile ? "" : "pb-16 sm:pb-20"}`}>
+  <main
+  className="relative min-w-0 flex-1 overflow-hidden"
+  onClick={!isWhiteboardOpen ? handleScreenTap : undefined}
+>         
+ {isWhiteboardOpen ? (
             <Whiteboard
               roomId={roomId}
               isHost={isHost}
@@ -231,7 +243,7 @@ function MeetingLayoutInner({ roomId, isHost, onLeave }: MeetingLayoutProps) {
           )}
         </main>
 
-        {panel === "participants" && (
+               {panel === "participants" && !isMobile && (
           <aside className="hidden h-full w-80 shrink-0 overflow-y-auto border-l border-white/10 bg-meet-bg md:block">
             <ParticipantsPanel
               onClose={() => setPanel("none")}
@@ -242,12 +254,30 @@ function MeetingLayoutInner({ roomId, isHost, onLeave }: MeetingLayoutProps) {
             />
           </aside>
         )}
-        {panel === "chat" && (
+        {panel === "chat" && !isMobile && (
           <aside className="hidden h-full w-80 shrink-0 overflow-y-auto border-l border-white/10 bg-meet-bg md:block">
             <ChatPanel roomId={roomId} onClose={() => setPanel("none")} />
           </aside>
         )}
       </div>
+
+      {/* Sur mobile, chat/participants s'ouvrent en plein écran plutôt qu'en sidebar */}
+      {isMobile && panel !== "none" && (
+        <div className="fixed inset-0 z-40 bg-meet-bg">
+          {panel === "participants" && (
+            <ParticipantsPanel
+              onClose={() => setPanel("none")}
+              roomId={roomId}
+              isHost={isHost}
+              lobbyRequests={lobbyRequests}
+              onLobbyRespond={refreshLobby}
+            />
+          )}
+          {panel === "chat" && <ChatPanel roomId={roomId} onClose={() => setPanel("none")} />}
+        </div>
+      )}
+
+      <ReactionOverlay reactions={reactions} />
 
       {/* Indicateur mains levées */}
            {raisedHands.size > 0 && (
@@ -282,7 +312,10 @@ function MeetingLayoutInner({ roomId, isHost, onLeave }: MeetingLayoutProps) {
         onToggleParticipants={() => togglePanel("participants")}
         onToggleWhiteboard={() => setIsWhiteboardOpen((v) => !v)}
         onToggleHand={handleToggleHand}
-        onLeave={onLeave}
+        onSendReaction={sendReaction}
+        onLeave={onLeave}     
+        controlsVisible={controlsVisible}
+
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { LogOut, Loader2, Video, Clock, CheckCircle2, CalendarPlus, Check, X } from "lucide-react";
 import { createMeeting, listMyMeetings, type MeetingListItem } from "../lib/meetingApi";
 import {
@@ -11,7 +11,7 @@ import {
 } from "../lib/bookingApi";
 import { NewBookingModal } from "../components/NewBookingModal";
 import { useAuth } from "../context/AuthContext";
-
+import { getAvatarColor } from "../lib/avatarColor";
 export function Home() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -122,10 +122,24 @@ export function Home() {
 
       <div className="flex items-center justify-end gap-3 py-4">
         {user && (
-          <span className="animate-fade-in text-sm text-meet-text-secondary">
-            Bonjour, <span className="font-medium text-meet-text-primary">{user.name}</span>
-          </span>
-        )}
+  <Link
+    to="/profile"
+    className="flex animate-fade-in items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm text-meet-text-secondary transition-colors duration-200 hover:bg-meet-bg-secondary/60 hover:text-meet-text-primary"
+  >
+    <span
+      className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium text-black"
+      style={{ backgroundColor: getAvatarColor(user.id) }}
+    >
+      {user.name
+        .split(" ")
+        .map((p) => p[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()}
+    </span>
+    <span className="hidden font-medium text-meet-text-primary sm:inline">{user.name}</span>
+  </Link>
+)}
         <button
           type="button"
           onClick={handleLogout}

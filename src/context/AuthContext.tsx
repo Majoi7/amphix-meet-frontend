@@ -23,6 +23,7 @@ interface AuthContextValue {
     role: "STUDENT" | "TEACHER";
   }) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (input: { name?: string; avatarUrl?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -31,9 +32,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
 
-  // Au premier chargement de l'app, on tente de restaurer la session via
-  // le cookie httpOnly de refresh token — l'utilisateur reste connecté
-  // même après avoir fermé l'onglet ou rechargé la page.
   useEffect(() => {
     let cancelled = false;
     authApi
@@ -87,8 +85,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("unauthenticated");
   }, []);
 
+  const updateProfile = useCallback(
+    async (input: { name?: string; avatarUrl?: string }) => {
+      const res = await authApi.updateMe(input);
+      setUser(res.user);
+    },
+    []
+  );
+
   return (
-    <AuthContext.Provider value={{ user, status, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, status, login, register, logout, updateProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );

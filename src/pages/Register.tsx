@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Loader2, Video } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { ApiClientError } from "../lib/authApi";
 
 export function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,6 +19,7 @@ export function Register() {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+
     try {
       await register({ email, password, name, role });
       navigate("/", { replace: true });
@@ -33,125 +35,373 @@ export function Register() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-meet-bg px-4 py-10">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute left-1/2 top-1/4 h-96 w-96 -translate-x-1/2 rounded-full bg-meet-blue/20 blur-[130px]" />
-        <div className="absolute bottom-0 left-1/4 h-72 w-72 rounded-full bg-meet-green/10 blur-[110px]" />
-      </div>
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-2">
+      {/* Desktop Background */}
+      <div
+        className="absolute inset-0 -z-20 hidden md:block"
+        style={{
+          backgroundImage: "url('/img1.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      />
 
-      <div className="w-full max-w-sm animate-slide-up">
-        <div className="mb-8 flex items-center justify-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-meet-blue to-meet-pink shadow-glow transition-transform duration-300 ease-fluid hover:rotate-6 hover:scale-105">
-            <Video size={24} className="text-white" />
+      {/* Mobile Background */}
+      <div
+        className="absolute inset-0 -z-20 md:hidden"
+        style={{
+          backgroundImage: "url('/img2.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
+      />
+
+      {/* Warm yellow overlay */}
+      <div className="absolute inset-0 -z-10 bg-[#E89B00]/20" />
+
+      {/* Soft dark gradient for readability */}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/5 via-black/10 to-black/30" />
+
+      <div className="w-full max-w-[340px]">
+        {/* Logo */}
+        <div className="mb-2 flex flex-col items-center">
+          <div
+            className="
+              mb-2 flex h-10 w-10 items-center justify-center
+              rounded-[14px]
+              border border-white/70
+              bg-gradient-to-br from-[#FFD83D] to-[#F5A900]
+              shadow-[0_8px_24px_rgba(120,70,0,0.30)]
+              transition-all duration-300
+              hover:-translate-y-1
+              hover:rotate-3
+              hover:scale-105
+            "
+          >
+            <img
+              src="/favicon.svg"
+              alt="Amphix Meet"
+              className="h-5 w-5 object-contain"
+            />
           </div>
-          <h1 className="bg-gradient-to-r from-white to-meet-text-secondary bg-clip-text text-2xl font-medium text-transparent">
+
+          <h1 className="text-xl font-bold tracking-tight text-white drop-shadow-lg">
             Amphix Meet
           </h1>
         </div>
 
+        {/* Register Panel */}
         <form
           onSubmit={handleSubmit}
-          className="space-y-4 rounded-2xl border border-meet-border/60 bg-meet-bg-secondary/40 p-6 shadow-panel backdrop-blur-sm sm:p-7"
+          className="
+            relative overflow-hidden
+            rounded-[20px]
+            border border-white/70
+            bg-[#FFF8E7]/90
+            p-4
+            shadow-[0_16px_48px_rgba(92,55,0,0.35)]
+            backdrop-blur-2xl
+          "
         >
-          <div>
-            <label htmlFor="name" className="mb-1.5 block text-sm text-meet-text-secondary">
-              Nom complet
-            </label>
-            <input
-              id="name"
-              type="text"
-              required
-              autoFocus
-              maxLength={100}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary transition-all duration-200 ease-fluid focus:outline-none focus-visible:border-meet-blue focus-visible:shadow-glow focus-visible:ring-2 focus-visible:ring-meet-blue/40"
-            />
-          </div>
+          {/* Decorative glow - top right */}
+          <div
+            className="
+              pointer-events-none absolute -right-12 -top-12
+              h-24 w-24 rounded-full
+              bg-[#FFD43B]/30
+              blur-3xl
+            "
+          />
 
-          <div>
-            <label htmlFor="email" className="mb-1.5 block text-sm text-meet-text-secondary">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary transition-all duration-200 ease-fluid focus:outline-none focus-visible:border-meet-blue focus-visible:shadow-glow focus-visible:ring-2 focus-visible:ring-meet-blue/40"
-            />
-          </div>
+          {/* Decorative glow - bottom left */}
+          <div
+            className="
+              pointer-events-none absolute -bottom-12 -left-12
+              h-24 w-24 rounded-full
+              bg-[#F5A900]/20
+              blur-3xl
+            "
+          />
 
-          <div>
-            <label htmlFor="password" className="mb-1.5 block text-sm text-meet-text-secondary">
-              Mot de passe
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary transition-all duration-200 ease-fluid focus:outline-none focus-visible:border-meet-blue focus-visible:shadow-glow focus-visible:ring-2 focus-visible:ring-meet-blue/40"
-            />
-            <p className="mt-1 text-xs text-meet-text-disabled">8 caractères minimum</p>
-          </div>
+          {/* Header */}
+          <div className="relative mb-3">
+            <h2 className="text-base font-bold text-[#2B2115]">
+              Créer un compte
+            </h2>
 
-          <div>
-            <span className="mb-1.5 block text-sm text-meet-text-secondary">Je suis…</span>
-            <div className="flex gap-2 rounded-lg border border-meet-border bg-meet-bg-secondary p-1">
-              <button
-                type="button"
-                onClick={() => setRole("STUDENT")}
-                className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-200 ease-fluid ${
-                  role === "STUDENT"
-                    ? "bg-gradient-to-r from-meet-blue to-meet-pink text-white shadow-glow"
-                    : "text-meet-text-secondary hover:bg-meet-control hover:text-meet-text-primary"
-                }`}
-              >
-                Étudiant
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole("TEACHER")}
-                className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-200 ease-fluid ${
-                  role === "TEACHER"
-                    ? "bg-gradient-to-r from-meet-blue to-meet-pink text-white shadow-glow"
-                    : "text-meet-text-secondary hover:bg-meet-control hover:text-meet-text-primary"
-                }`}
-              >
-                Enseignant
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-meet-blue to-meet-pink bg-[length:200%_100%] bg-left px-6 py-3 text-sm font-medium text-white shadow-glow transition-all duration-300 ease-fluid hover:scale-[1.02] hover:bg-right active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
-          >
-            {isSubmitting && <Loader2 size={18} className="animate-spin" />}
-            Créer mon compte
-          </button>
-
-          {error && (
-            <p role="alert" className="animate-slide-down text-center text-sm text-meet-yellow">
-              {error}
+            <p className="mt-0.5 text-xs text-[#765D35]">
+              Quelques informations pour commencer.
             </p>
-          )}
-        </form>
+          </div>
 
-        <p className="mt-6 text-center text-sm text-meet-text-secondary">
-          Déjà un compte ?{" "}
-          <Link
-            to="/login"
-            className="font-medium text-meet-blue-soft transition-colors duration-200 hover:text-meet-blue hover:underline"
-          >
-            Se connecter
-          </Link>
-        </p>
+          <div className="relative space-y-2.5">
+            {/* Name */}
+            <div>
+              <label
+                htmlFor="name"
+                className="mb-1 block text-xs font-semibold text-[#3A2A16]"
+              >
+                Nom complet
+              </label>
+
+              <input
+                id="name"
+                type="text"
+                required
+                autoFocus
+                maxLength={100}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Votre nom complet"
+                className="
+                  w-full rounded-[10px]
+                  border border-gray-200
+                  bg-white/80
+                  px-4 py-2
+                  text-sm text-[#2B2115]
+                  placeholder:text-[#A89570]
+                  shadow-[0_2px_6px_rgba(120,80,0,0.05)]
+                  outline-none
+                  transition-all duration-200
+                  focus:border-[#F2B600]
+                  focus:bg-white
+                  focus:ring-4
+                  focus:ring-[#FFC928]/20
+                "
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-1 block text-xs font-semibold text-[#3A2A16]"
+              >
+                Adresse email
+              </label>
+
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ton@email.com"
+                className="
+                  w-full rounded-[10px]
+                  border border-gray-200
+                  bg-white/80
+                  px-4 py-2
+                  text-sm text-[#2B2115]
+                  placeholder:text-[#A89570]
+                  shadow-[0_2px_6px_rgba(120,80,0,0.05)]
+                  outline-none
+                  transition-all duration-200
+                  focus:border-[#F2B600]
+                  focus:bg-white
+                  focus:ring-4
+                  focus:ring-[#FFC928]/20
+                "
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-1 block text-xs font-semibold text-[#3A2A16]"
+              >
+                Mot de passe
+              </label>
+
+              <input
+                id="password"
+                type="password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="
+                  w-full rounded-[10px]
+                  border border-gray-200
+                  bg-white/80
+                  px-4 py-2
+                  text-sm text-[#2B2115]
+                  placeholder:text-[#A89570]
+                  shadow-[0_2px_6px_rgba(120,80,0,0.05)]
+                  outline-none
+                  transition-all duration-200
+                  focus:border-[#F2B600]
+                  focus:bg-white
+                  focus:ring-4
+                  focus:ring-[#FFC928]/20
+                "
+              />
+
+              <p className="mt-0.5 text-[10px] text-[#9A8259]">
+                8 caractères minimum
+              </p>
+            </div>
+
+            {/* Role */}
+            <div>
+              <span className="mb-1 block text-xs font-semibold text-[#3A2A16]">
+                Je suis…
+              </span>
+
+              <div
+                className="
+                  flex gap-1
+                  rounded-[10px]
+                  border border-gray-200
+                  bg-[#F7EBCF]/70
+                  p-1
+                "
+              >
+                {/* Student */}
+                <button
+                  type="button"
+                  onClick={() => setRole("STUDENT")}
+                  className={`
+                    flex-1 rounded-[8px]
+                    px-3 py-1.5
+                    text-xs font-semibold
+                    transition-all duration-200
+                    ${
+                      role === "STUDENT"
+                        ? `
+                          bg-gradient-to-r
+                          from-[#FFC928]
+                          to-[#F5A900]
+                          text-[#2B2115]
+                          shadow-[0_4px_12px_rgba(220,145,0,0.25)]
+                        `
+                        : `
+                          text-[#765D35]
+                          hover:bg-white/70
+                          hover:text-[#3A2A16]
+                        `
+                    }
+                  `}
+                >
+                  Étudiant
+                </button>
+
+                {/* Teacher */}
+                <button
+                  type="button"
+                  onClick={() => setRole("TEACHER")}
+                  className={`
+                    flex-1 rounded-[8px]
+                    px-3 py-1.5
+                    text-xs font-semibold
+                    transition-all duration-200
+                    ${
+                      role === "TEACHER"
+                        ? `
+                          bg-gradient-to-r
+                          from-[#FFC928]
+                          to-[#F5A900]
+                          text-[#2B2115]
+                          shadow-[0_4px_12px_rgba(220,145,0,0.25)]
+                        `
+                        : `
+                          text-[#765D35]
+                          hover:bg-white/70
+                          hover:text-[#3A2A16]
+                        `
+                    }
+                  `}
+                >
+                  Enseignant
+                </button>
+              </div>
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="
+                flex w-full items-center justify-center gap-2
+                rounded-[10px]
+                bg-gradient-to-r
+                from-[#FFC928]
+                to-[#F5A900]
+                px-6 py-2
+                text-sm font-bold
+                text-[#2B2115]
+                shadow-[0_4px_14px_rgba(220,145,0,0.30)]
+                transition-all duration-200
+                hover:-translate-y-[1px]
+                hover:from-[#FFD43B]
+                hover:to-[#FFB300]
+                hover:shadow-[0_8px_18px_rgba(220,145,0,0.40)]
+                active:translate-y-0
+                active:scale-[0.98]
+                disabled:cursor-not-allowed
+                disabled:opacity-60
+              "
+            >
+              {isSubmitting && (
+                <Loader2 size={16} className="animate-spin" />
+              )}
+
+              {isSubmitting
+                ? "Création du compte..."
+                : "Créer mon compte"}
+            </button>
+
+            {/* Error */}
+            {error && (
+              <div
+                role="alert"
+                className="
+                  rounded-lg
+                  border border-red-200
+                  bg-red-50
+                  px-4 py-2
+                  text-center
+                  text-xs font-medium
+                  text-red-600
+                "
+              >
+                {error}
+              </div>
+            )}
+          </div>
+
+          {/* Separator */}
+          <div className="relative my-3 flex items-center gap-3">
+            <div className="h-px flex-1 bg-[#E6D3A5]" />
+
+            <span className="text-[10px] font-medium text-[#9A8259]">
+              OU
+            </span>
+
+            <div className="h-px flex-1 bg-[#E6D3A5]" />
+          </div>
+
+          {/* Login Link */}
+          <p className="relative text-center text-xs text-[#765D35]">
+            Déjà un compte ?{" "}
+            <Link
+              to="/login"
+              className="
+                font-bold
+                text-[#C27D00]
+                underline underline-offset-4
+                transition-colors
+                hover:text-[#8F5D00]
+              "
+            >
+              Se connecter
+            </Link>
+          </p>
+        </form>
       </div>
     </div>
   );

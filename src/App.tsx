@@ -6,6 +6,7 @@ import { RoomPage } from "./pages/Room";
 import { EmbedRoomPage } from "./pages/EmbedRoom";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
+import { Profile } from "./pages/Profile";
 
 export function App() {
   return (
@@ -36,6 +37,14 @@ export function App() {
                     </RequireAuth>
                   }
                 />
+                <Route
+  path="/profile"
+  element={
+    <RequireAuth>
+      <Profile />
+    </RequireAuth>
+  }
+/>
               </Routes>
             </AuthProvider>
           }
