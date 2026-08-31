@@ -1,4 +1,4 @@
-import { MicOff } from "lucide-react";
+import { MicOff, Pin, PinOff } from "lucide-react";
 import {
   VideoTrack,
   useIsSpeaking,
@@ -16,6 +16,8 @@ interface ParticipantTileProps {
   trackRef: TrackReferenceOrPlaceholder;
   isLocal?: boolean;
   isScreenShare?: boolean;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
   className?: string;
 }
 
@@ -50,6 +52,8 @@ export function ParticipantTile({
   trackRef,
   isLocal = false,
   isScreenShare = false,
+  isPinned = false,
+  onTogglePin,
   className = "",
 }: ParticipantTileProps) {
   const isSpeaking = useIsSpeaking(trackRef.participant);
@@ -122,6 +126,18 @@ export function ParticipantTile({
         <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-meet-blue/90 shadow">
           <MicOff size={14} className="text-white" />
         </div>
+      )}
+            {/* Bouton épingle — affiché seulement si onTogglePin est fourni */}
+      {!isScreenShare && onTogglePin && (
+        <button
+          type="button"
+          onClick={onTogglePin}
+          aria-label={isPinned ? "Désépingler" : "Épingler"}
+          title={isPinned ? "Désépingler" : "Épingler"}
+          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white opacity-0 shadow transition-opacity duration-150 hover:bg-black/70 group-hover:opacity-100"
+        >
+          {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+        </button>
       )}
 
       {/* Qualité réseau — affichée seulement si dégradée */}

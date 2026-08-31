@@ -38,10 +38,10 @@ export function PreJoin({ onJoin, isJoining, error }: PreJoinProps) {
 
       <div className="w-full max-w-md animate-scale-in lg:max-w-lg">
         <DevicePreview
-          displayName={user?.name ?? ""}
-          avatarUrl={user?.avatarUrl}
-          onDeviceStateChange={setDeviceState}
-        />
+  displayName={user?.name ?? ""}
+  avatarUrl={user?.avatarUrl ?? undefined}
+  onDeviceStateChange={setDeviceState}
+/>
       </div>
 
       <form
