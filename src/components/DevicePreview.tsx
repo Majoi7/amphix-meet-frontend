@@ -4,6 +4,8 @@ import { getAvatarColor } from "../lib/avatarColor";
 
 interface DevicePreviewProps {
   displayName: string;
+  avatarUrl?: string;                 // ← ajouté
+
   onDeviceStateChange: (state: { micEnabled: boolean; cameraEnabled: boolean }) => void;
 }
 
@@ -12,7 +14,7 @@ interface DevicePreviewProps {
  * immédiatement une impression de produit professionnel — l'utilisateur
  * voit à quoi il ressemblera avant d'entrer dans la salle.
  */
-export function DevicePreview({ displayName, onDeviceStateChange }: DevicePreviewProps) {
+export function DevicePreview({ displayName, avatarUrl, onDeviceStateChange }: DevicePreviewProps) {
   const { videoRef, micEnabled, cameraEnabled, toggleMic, toggleCamera, error } =
     useMediaPreview();
 
@@ -30,7 +32,7 @@ export function DevicePreview({ displayName, onDeviceStateChange }: DevicePrevie
 
   return (
     <div className="w-full max-w-xl">
-      <div className="relative aspect-video w-full overflow-hidden rounded-tile bg-meet-tile shadow-lg">
+        <div className="relative aspect-video w-full overflow-hidden rounded-tile bg-meet-tile shadow-lg">
         {cameraEnabled ? (
           <video
             ref={videoRef}
@@ -41,12 +43,21 @@ export function DevicePreview({ displayName, onDeviceStateChange }: DevicePrevie
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <div
-              className="flex h-20 w-20 items-center justify-center rounded-full text-2xl font-medium text-meet-bg"
-              style={{ backgroundColor: getAvatarColor(displayName) }}
-            >
-              {initials}
-            </div>
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-20 w-20 rounded-full object-cover"
+              />
+            ) : (
+              <div
+                className="flex h-20 w-20 items-center justify-center rounded-full text-2xl font-medium text-meet-bg"
+                style={{ backgroundColor: getAvatarColor(displayName) }}
+              >
+                {initials}
+              </div>
+            )}
+        
           </div>
         )}
 

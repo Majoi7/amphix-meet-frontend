@@ -19,6 +19,21 @@ interface ParticipantTileProps {
   className?: string;
 }
 
+/** Métadonnées JSON attachées au participant côté serveur lors de la génération du token LiveKit. */
+interface ParticipantMetadata {
+  avatarUrl?: string;
+}
+
+function parseAvatarUrl(metadata: string | undefined): string | undefined {
+  if (!metadata) return undefined;
+  try {
+    const parsed = JSON.parse(metadata) as ParticipantMetadata;
+    return parsed.avatarUrl || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Tuile d'un participant, calquée sur le rendu Google Meet :
  * - Caméra : ratio 16/9, coins arrondis.
@@ -28,6 +43,8 @@ interface ParticipantTileProps {
  *   nom).
  * - Qualité réseau : point discret, affiché seulement si dégradée.
  * - Screen share : object-contain, pas de ratio forcé.
+ * - Caméra coupée : photo de profil si disponible via les métadonnées
+ *   du participant, sinon initiales colorées (fallback).
  */
 export function ParticipantTile({
   trackRef,
@@ -46,6 +63,7 @@ export function ParticipantTile({
   const displayName = trackRef.participant.name || trackRef.participant.identity;
   const initials = displayName.trim().slice(0, 1).toUpperCase() || "?";
   const avatarColor = getAvatarColor(trackRef.participant.identity);
+  const avatarUrl = parseAvatarUrl(trackRef.participant.metadata);
 
   const containerClasses = [
     "group relative overflow-hidden bg-meet-tile transition-shadow duration-150",
@@ -71,12 +89,20 @@ export function ParticipantTile({
         <VideoTrack trackRef={trackRef as TrackReference} className={videoClasses} />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#3c4c73] to-[#1f2536]">
-          <div
-            className="flex h-20 w-20 items-center justify-center rounded-full text-2xl font-medium text-meet-bg shadow-lg sm:h-28 sm:w-28 sm:text-4xl"
-            style={{ backgroundColor: avatarColor }}
-          >
-            {initials}
-          </div>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-20 w-20 rounded-full object-cover shadow-lg sm:h-28 sm:w-28"
+            />
+          ) : (
+            <div
+              className="flex h-20 w-20 items-center justify-center rounded-full text-2xl font-medium text-meet-bg shadow-lg sm:h-28 sm:w-28 sm:text-4xl"
+              style={{ backgroundColor: avatarColor }}
+            >
+              {initials}
+            </div>
+          )}
         </div>
       )}
 

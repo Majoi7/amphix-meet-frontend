@@ -157,18 +157,17 @@ export function Register() {
                 placeholder="Votre nom complet"
                 className="
                   w-full rounded-[10px]
-                  border border-gray-200
-                  bg-white/80
+                  border border-gray-300
+                  bg-white
                   px-4 py-2
-                  text-sm text-[#2B2115]
-                  placeholder:text-[#A89570]
-                  shadow-[0_2px_6px_rgba(120,80,0,0.05)]
+                  text-sm text-black
+                  placeholder:text-gray-400
+                  shadow-sm
                   outline-none
                   transition-all duration-200
-                  focus:border-[#F2B600]
-                  focus:bg-white
+                  focus:border-gray-400
                   focus:ring-4
-                  focus:ring-[#FFC928]/20
+                  focus:ring-gray-900/5
                 "
               />
             </div>
@@ -191,18 +190,17 @@ export function Register() {
                 placeholder="ton@email.com"
                 className="
                   w-full rounded-[10px]
-                  border border-gray-200
-                  bg-white/80
+                  border border-gray-300
+                  bg-white
                   px-4 py-2
-                  text-sm text-[#2B2115]
-                  placeholder:text-[#A89570]
-                  shadow-[0_2px_6px_rgba(120,80,0,0.05)]
+                  text-sm text-black
+                  placeholder:text-gray-400
+                  shadow-sm
                   outline-none
                   transition-all duration-200
-                  focus:border-[#F2B600]
-                  focus:bg-white
+                  focus:border-gray-400
                   focus:ring-4
-                  focus:ring-[#FFC928]/20
+                  focus:ring-gray-900/5
                 "
               />
             </div>
@@ -226,18 +224,17 @@ export function Register() {
                 placeholder="••••••••"
                 className="
                   w-full rounded-[10px]
-                  border border-gray-200
-                  bg-white/80
+                  border border-gray-300
+                  bg-white
                   px-4 py-2
-                  text-sm text-[#2B2115]
-                  placeholder:text-[#A89570]
-                  shadow-[0_2px_6px_rgba(120,80,0,0.05)]
+                  text-sm text-black
+                  placeholder:text-gray-400
+                  shadow-sm
                   outline-none
                   transition-all duration-200
-                  focus:border-[#F2B600]
-                  focus:bg-white
+                  focus:border-gray-400
                   focus:ring-4
-                  focus:ring-[#FFC928]/20
+                  focus:ring-gray-900/5
                 "
               />
 

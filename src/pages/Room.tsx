@@ -9,7 +9,7 @@ import {
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { Hand } from "lucide-react";
-import { joinMeeting, getLobbyStatus } from "../lib/meetingApi";
+import { joinMeeting, getLobbyStatus, endMeeting as endMeetingApi } from "../lib/meetingApi";
 import { PreJoin } from "./PreJoin";
 import { WaitingForApproval } from "../components/WaitingForApproval";
 import { VideoGrid } from "../components/VideoGrid";
@@ -128,6 +128,22 @@ export function RoomPage() {
     navigate("/");
   }
 
+  /** Hôte uniquement — coupe réellement la réunion pour tout le monde
+   * côté serveur (LiveKit + DB), même si les 3h ne sont pas atteintes.
+   * On quitte localement dans tous les cas, même si l'appel échoue :
+   * le disconnect LiveKit (onDisconnected → handleLeave) prendra le
+   * relais si la room a bien été fermée côté serveur. */
+  async function handleEndMeeting() {
+    if (!roomId) return;
+    try {
+      await endMeetingApi(roomId);
+    } catch (err) {
+      console.error("[RoomPage] Erreur lors de la fermeture de la réunion:", err);
+    } finally {
+      handleLeave();
+    }
+  }
+
   function handleRoomError(err: Error) {
     console.error("[LiveKitRoom] Erreur de connexion:", err);
     hadErrorRef.current = true;
@@ -162,7 +178,12 @@ export function RoomPage() {
       className="h-screen overflow-hidden"
       data-lk-theme="default"
     >
-      <MeetingLayout roomId={roomId} isHost={connection.isHost} onLeave={handleLeave} />
+      <MeetingLayout
+        roomId={roomId}
+        isHost={connection.isHost}
+        onLeave={handleLeave}
+        onEndMeeting={handleEndMeeting}
+      />
       <RoomAudioRenderer />
       <StartAudio label="Cliquer pour activer le son" />
     </LiveKitRoom>
@@ -173,17 +194,23 @@ interface MeetingLayoutProps {
   roomId: string;
   isHost: boolean;
   onLeave: () => void;
+  onEndMeeting: () => void;
 }
 
-function MeetingLayout({ roomId, isHost, onLeave }: MeetingLayoutProps) {
+function MeetingLayout({ roomId, isHost, onLeave, onEndMeeting }: MeetingLayoutProps) {
   return (
     <ToastProvider>
-      <MeetingLayoutInner roomId={roomId} isHost={isHost} onLeave={onLeave} />
+      <MeetingLayoutInner
+        roomId={roomId}
+        isHost={isHost}
+        onLeave={onLeave}
+        onEndMeeting={onEndMeeting}
+      />
     </ToastProvider>
   );
 }
 
-function MeetingLayoutInner({ roomId, isHost, onLeave }: MeetingLayoutProps) {
+function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLayoutProps) {
   const [panel, setPanel] = useState<PanelState>("none");
   const [lastReadCount, setLastReadCount] = useState(0);
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
@@ -308,12 +335,14 @@ function MeetingLayoutInner({ roomId, isHost, onLeave }: MeetingLayoutProps) {
         unreadChatCount={unreadChatCount}
         participantCount={participants.length}
         pendingLobbyCount={lobbyRequests.length}
+        isHost={isHost}
         onToggleChat={() => togglePanel("chat")}
         onToggleParticipants={() => togglePanel("participants")}
         onToggleWhiteboard={() => setIsWhiteboardOpen((v) => !v)}
         onToggleHand={handleToggleHand}
         onSendReaction={sendReaction}
-        onLeave={onLeave}     
+        onLeave={onLeave}
+        onEndMeeting={onEndMeeting}
         controlsVisible={controlsVisible}
 
       />

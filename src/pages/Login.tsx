@@ -140,18 +140,17 @@ export function Login() {
                 placeholder="ton@email.com"
                 className="
                   w-full rounded-[12px]
-                  border border-gray-200
-                  bg-white/80
+                  border border-gray-300
+                  bg-white
                   px-4 py-2.5
-                  text-sm text-[#2B2115]
-                  placeholder:text-[#A89570]
-                  shadow-[0_2px_8px_rgba(120,80,0,0.05)]
+                  text-sm text-black
+                  placeholder:text-gray-400
+                  shadow-sm
                   outline-none
                   transition-all duration-200
-                  focus:border-[#F2B600]
-                  focus:bg-white
+                  focus:border-gray-400
                   focus:ring-4
-                  focus:ring-[#FFC928]/20
+                  focus:ring-gray-900/5
                 "
               />
             </div>
@@ -174,18 +173,17 @@ export function Login() {
                 placeholder="••••••••"
                 className="
                   w-full rounded-[12px]
-                  border border-gray-200
-                  bg-white/80
+                  border border-gray-300
+                  bg-white
                   px-4 py-2.5
-                  text-sm text-[#2B2115]
-                  placeholder:text-[#A89570]
-                  shadow-[0_2px_8px_rgba(120,80,0,0.05)]
+                  text-sm text-black
+                  placeholder:text-gray-400
+                  shadow-sm
                   outline-none
                   transition-all duration-200
-                  focus:border-[#F2B600]
-                  focus:bg-white
+                  focus:border-gray-400
                   focus:ring-4
-                  focus:ring-[#FFC928]/20
+                  focus:ring-gray-900/5
                 "
               />
             </div>
@@ -263,8 +261,6 @@ export function Login() {
             </Link>
           </p>
         </form>
-
-       
       </div>
     </div>
   );

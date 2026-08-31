@@ -20,12 +20,14 @@ interface MeetControlsProps {
   unreadChatCount: number;
   participantCount: number;
   pendingLobbyCount: number;
+  isHost: boolean;
   onToggleChat: () => void;
   onToggleParticipants: () => void;
   onToggleWhiteboard: () => void;
   onToggleHand: () => void;
   onSendReaction: (emoji: string) => void;
   onLeave: () => void;
+  onEndMeeting: () => void;
   /** Mobile uniquement — contrôle l'affichage/masquage auto de la barre. */
   controlsVisible?: boolean;
 }
@@ -65,6 +67,33 @@ function SwirlIcon({ className = "" }: { className?: string }) {
   );
 }
 
+/** Bouton "lever/baisser la main" — bouton principal à part, partagé
+ * entre mobile et desktop (même taille h-12 w-12 dans les deux cas). */
+function HandRaiseButton({
+  isHandRaised,
+  onToggleHand,
+}: {
+  isHandRaised: boolean;
+  onToggleHand: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggleHand}
+      aria-pressed={isHandRaised}
+      aria-label="Lever/baisser la main"
+      title="Lever/baisser la main"
+      className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full transition-all ${
+        isHandRaised
+          ? "bg-yellow-500 text-black hover:bg-yellow-400"
+          : "bg-white/10 text-white hover:bg-white/20"
+      }`}
+    >
+      <Icon name="back_hand" filled={isHandRaised} className="text-[22px]" />
+    </button>
+  );
+}
+
 function useElapsed(start: number) {
   const [elapsed, setElapsed] = useState("00:00");
   useEffect(() => {
@@ -84,13 +113,51 @@ function useElapsed(start: number) {
   return elapsed;
 }
 
+/** Modale de confirmation — partagée entre mobile et desktop. Action
+ * irréversible (coupe tout le monde côté LiveKit), donc jamais déclenchée
+ * sans passer par ici. */
+function EndMeetingConfirm({
+  onConfirm,
+  onCancel,
+}: {
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-sm rounded-2xl bg-[#1a1a1a] p-5 shadow-2xl ring-1 ring-white/10">
+        <h3 className="mb-1.5 text-base font-medium text-white">Terminer la réunion pour tous ?</h3>
+        <p className="mb-4 text-sm text-white/60">
+          Tous les participants seront déconnectés immédiatement. Cette action est irréversible.
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-full px-4 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/5"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-full bg-[#ea4335] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#d33426]"
+          >
+            Terminer pour tous
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MeetControls(props: MeetControlsProps) {
   const isMobile = useIsMobile();
   return isMobile ? <MobileControls {...props} /> : <DesktopControls {...props} />;
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   MOBILE — 4 boutons, apparition/disparition sur tap écran
+   MOBILE
    ═══════════════════════════════════════════════════════════════ */
 function MobileControls({
   roomId,
@@ -102,12 +169,14 @@ function MobileControls({
   unreadChatCount,
   participantCount,
   pendingLobbyCount,
+  isHost,
   onToggleChat,
   onToggleParticipants,
   onToggleWhiteboard,
   onToggleHand,
   onSendReaction,
   onLeave,
+  onEndMeeting,
   controlsVisible = true,
 }: MeetControlsProps) {
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } =
@@ -120,8 +189,8 @@ function MobileControls({
   const [showSheet, setShowSheet] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
 
-  // Quand la barre se cache (inactivité), on referme aussi les popups ouverts.
   useEffect(() => {
     if (!controlsVisible) {
       setShowSheet(false);
@@ -168,7 +237,7 @@ function MobileControls({
   return (
     <>
       <div
-        className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-24 items-center justify-center gap-3 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-4 transition-transform duration-300 ease-out ${
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-24 items-center justify-center gap-2.5 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-4 transition-transform duration-300 ease-out ${
           controlsVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
@@ -206,12 +275,20 @@ function MobileControls({
           )}
         </div>
 
+        {/* Main levée — bouton principal à part */}
+        <div className="pointer-events-auto relative flex-shrink-0">
+          <HandRaiseButton isHandRaised={isHandRaised} onToggleHand={onToggleHand} />
+          {raisedHandsCount > 0 && !isHandRaised && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-yellow-500 px-1 text-[9px] font-bold text-black">
+              {raisedHandsCount}
+            </span>
+          )}
+        </div>
+
         {/* Réactions — le picker ne se ferme que via ce bouton */}
         <div className="pointer-events-auto relative flex-shrink-0">
           {showEmojiPicker && (
             <EmojiPicker
-              isHandRaised={isHandRaised}
-              onToggleHand={onToggleHand}
               onSendReaction={onSendReaction}
               className="absolute bottom-full left-1/2 mb-3 -translate-x-1/2"
             />
@@ -219,18 +296,13 @@ function MobileControls({
           <button
             type="button"
             onClick={() => setShowEmojiPicker((v) => !v)}
-            className={`relative flex h-12 w-12 items-center justify-center rounded-full transition-all ${
-              showEmojiPicker || isHandRaised
+            className={`flex h-12 w-12 items-center justify-center rounded-full transition-all ${
+              showEmojiPicker
                 ? "bg-yellow-500 text-black hover:bg-yellow-400"
                 : "bg-white/10 text-white hover:bg-white/20"
             }`}
           >
-            <Icon name="mood" filled={showEmojiPicker || isHandRaised} className="text-[22px]" />
-            {raisedHandsCount > 0 && !isHandRaised && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-yellow-500 px-1 text-[9px] font-bold text-black">
-                {raisedHandsCount}
-              </span>
-            )}
+            <Icon name="mood" filled={showEmojiPicker} className="text-[22px]" />
           </button>
         </div>
 
@@ -239,7 +311,7 @@ function MobileControls({
           type="button"
           onClick={() => setShowSheet(true)}
           aria-label="Plus d'options"
-          className="pointer-events-auto relative ml-3 flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4285f4] to-[#1a5fd6] text-white shadow-[0_4px_20px_rgba(66,133,244,0.55)] transition-transform duration-200 ease-fluid hover:scale-105 active:scale-95"
+          className="pointer-events-auto relative ml-2 flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4285f4] to-[#1a5fd6] text-white shadow-[0_4px_20px_rgba(66,133,244,0.55)] transition-transform duration-200 ease-fluid hover:scale-105 active:scale-95"
         >
           <SwirlIcon className="h-7 w-7" />
           {hasNotification && (
@@ -323,6 +395,20 @@ function MobileControls({
 
               <div className="my-2 border-t border-white/10" />
 
+              {isHost && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSheet(false);
+                    setShowEndConfirm(true);
+                  }}
+                  className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-[#ea4335]/40 px-3 py-3.5 text-sm font-medium text-[#ea4335] transition-colors hover:bg-[#ea4335]/10"
+                >
+                  <Icon name="cancel_presentation" className="text-[20px]" />
+                  Terminer pour tous
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={onLeave}
@@ -334,6 +420,16 @@ function MobileControls({
             </div>
           </div>
         </div>
+      )}
+
+      {showEndConfirm && (
+        <EndMeetingConfirm
+          onConfirm={() => {
+            setShowEndConfirm(false);
+            onEndMeeting();
+          }}
+          onCancel={() => setShowEndConfirm(false)}
+        />
       )}
     </>
   );
@@ -373,7 +469,7 @@ function SheetItem({
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   DESKTOP — le picker ne se ferme plus au clic sur un emoji
+   DESKTOP — main levée + partage d'écran promus en boutons principaux
    ═══════════════════════════════════════════════════════════════ */
 function DesktopControls({
   roomId,
@@ -386,12 +482,14 @@ function DesktopControls({
   unreadChatCount,
   participantCount,
   pendingLobbyCount,
+  isHost,
   onToggleChat,
   onToggleParticipants,
   onToggleWhiteboard,
   onToggleHand,
   onSendReaction,
   onLeave,
+  onEndMeeting,
 }: MeetControlsProps) {
   const { isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
 
@@ -399,7 +497,7 @@ function DesktopControls({
   const cameraToggle = useTrackToggle({ source: Track.Source.Camera });
   const screenShareToggle = useTrackToggle({ source: Track.Source.ScreenShare });
   const { isFullscreen, toggleFullscreen } = useFullscreen();
-
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [openDeviceMenu, setOpenDeviceMenu] = useState<"none" | "mic" | "camera">("none");
   const [showMore, setShowMore] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -493,11 +591,32 @@ function DesktopControls({
           </div>
         </div>
 
+        {/* Partage d'écran — promu en bouton principal, à côté de la main et des réactions */}
+        <button
+          type="button"
+          onClick={() => screenShareToggle.toggle()}
+          aria-pressed={isScreenShareEnabled}
+          aria-label={isScreenShareEnabled ? "Arrêter le partage d'écran" : "Partager l'écran"}
+          title={isScreenShareEnabled ? "Arrêter le partage d'écran" : "Partager l'écran"}
+          className={`flex h-12 w-12 items-center justify-center rounded-full transition-all ${
+            isScreenShareEnabled
+              ? "bg-[#8ab4f8] text-black hover:bg-[#aecbfa]"
+              : "bg-white/10 text-white hover:bg-white/20"
+          }`}
+        >
+          <Icon
+            name={isScreenShareEnabled ? "stop_screen_share" : "present_to_all"}
+            filled={isScreenShareEnabled}
+            className="text-[22px]"
+          />
+        </button>
+
+        {/* Main levée — bouton principal à part */}
+        <HandRaiseButton isHandRaised={isHandRaised} onToggleHand={onToggleHand} />
+
         <div className="relative">
           {showEmojiPicker && (
             <EmojiPicker
-              isHandRaised={isHandRaised}
-              onToggleHand={onToggleHand}
               onSendReaction={onSendReaction}
               className="absolute bottom-full left-1/2 mb-3 -translate-x-1/2"
             />
@@ -506,12 +625,12 @@ function DesktopControls({
             type="button"
             onClick={() => setShowEmojiPicker((v) => !v)}
             className={`flex h-12 w-12 items-center justify-center rounded-full transition-all ${
-              showEmojiPicker || isHandRaised
+              showEmojiPicker
                 ? "bg-yellow-500 text-black hover:bg-yellow-400"
                 : "bg-white/10 text-white hover:bg-white/20"
             }`}
           >
-            <Icon name="mood" filled={showEmojiPicker || isHandRaised} className="text-[22px]" />
+            <Icon name="mood" filled={showEmojiPicker} className="text-[22px]" />
           </button>
         </div>
 
@@ -556,24 +675,6 @@ function DesktopControls({
               <button
                 type="button"
                 onClick={() => {
-                  screenShareToggle.toggle();
-                  setShowMore(false);
-                }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-white transition-colors hover:bg-white/5 ${
-                  isScreenShareEnabled ? "bg-white/5" : ""
-                }`}
-              >
-                <Icon
-                  name={isScreenShareEnabled ? "stop_screen_share" : "present_to_all"}
-                  filled={isScreenShareEnabled}
-                  className="text-[20px]"
-                />
-                <span>{isScreenShareEnabled ? "Arrêter le partage" : "Partager l'écran"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
                   onToggleParticipants();
                   setShowMore(false);
                 }}
@@ -615,6 +716,23 @@ function DesktopControls({
                 <span>{isFullscreen ? "Quitter le plein écran" : "Plein écran"}</span>
               </button>
 
+              {isHost && (
+                <>
+                  <div className="my-2 border-t border-white/10" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMore(false);
+                      setShowEndConfirm(true);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-[#ea4335] transition-colors hover:bg-[#ea4335]/10"
+                  >
+                    <Icon name="cancel_presentation" className="text-[20px]" />
+                    <span>Terminer pour tous</span>
+                  </button>
+                </>
+              )}
+
               <div className="my-2 border-t border-white/10" />
 
               <div className="px-3 py-2">
@@ -646,6 +764,16 @@ function DesktopControls({
           )}
         </div>
       </div>
+
+      {showEndConfirm && (
+        <EndMeetingConfirm
+          onConfirm={() => {
+            setShowEndConfirm(false);
+            onEndMeeting();
+          }}
+          onCancel={() => setShowEndConfirm(false)}
+        />
+      )}
     </div>
   );
 }

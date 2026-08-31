@@ -1,6 +1,21 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { LogOut, Loader2, Video, Clock, CheckCircle2, CalendarPlus, Check, X } from "lucide-react";
+import {
+  LogOut,
+  Loader2,
+  Video,
+  Clock,
+  CheckCircle2,
+  CalendarPlus,
+  Check,
+  X,
+  Plus,
+  ArrowRight,
+  History,
+  Settings,
+  User,
+  Inbox,
+} from "lucide-react";
 import { createMeeting, listMyMeetings, type MeetingListItem } from "../lib/meetingApi";
 import {
   listMyBookings,
@@ -12,6 +27,7 @@ import {
 import { NewBookingModal } from "../components/NewBookingModal";
 import { useAuth } from "../context/AuthContext";
 import { getAvatarColor } from "../lib/avatarColor";
+
 export function Home() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -22,6 +38,7 @@ export function Home() {
   const [bookings, setBookings] = useState<BookingSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   function refreshBookings() {
     listMyBookings()
@@ -38,7 +55,7 @@ export function Home() {
         setBookings(bookingsRes.bookings);
       })
       .catch(() => {
-        /* silencieux — dashboard non bloquant */
+        /* silencieux */
       })
       .finally(() => setIsLoading(false));
   }, []);
@@ -109,233 +126,386 @@ export function Home() {
     (pendingReceivedBookings.length > 0 ||
       upcomingBookings.length > 0 ||
       activeMeetings.length > 0 ||
-      pastMeetings.length > 0);
+      (showHistory && pastMeetings.length > 0));
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-meet-bg px-4 pb-10 sm:px-6 lg:px-10">
-      {/* Ambiance de fond — dégradés doux, purement décoratifs */}
+    <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0a] text-white">
+      {/* Ambiance de fond */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-meet-blue/20 blur-[120px]" />
-        <div className="absolute right-0 top-1/3 h-80 w-80 rounded-full bg-meet-pink/10 blur-[110px]" />
-        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-meet-green/10 blur-[100px]" />
+        <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-[#FFD83D]/8 blur-[140px]" />
+        <div className="absolute right-0 top-1/4 h-[400px] w-[400px] rounded-full bg-[#F5A900]/6 blur-[120px]" />
+        <div className="absolute bottom-0 left-1/4 h-[350px] w-[350px] rounded-full bg-[#ff6b00]/5 blur-[100px]" />
       </div>
 
-      <div className="flex items-center justify-end gap-3 py-4">
-        {user && (
-  <Link
-    to="/profile"
-    className="flex animate-fade-in items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm text-meet-text-secondary transition-colors duration-200 hover:bg-meet-bg-secondary/60 hover:text-meet-text-primary"
+      {/* Header sticky */}
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0a]/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#FFD83D] to-[#F5A900]">
+              <img src="/favicon.svg" alt="" className="h-5 w-5 object-contain" />
+            </div>
+            <span className="text-lg font-bold tracking-tight">Amphix Meet</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {user && (
+              <Link
+                to="/profile"
+                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm transition-all hover:bg-white/10"
+              >
+                {user.avatarUrl ? (
+  <img
+    src={user.avatarUrl}
+    alt=""
+    className="h-7 w-7 rounded-full object-cover"
+  />
+) : (
+  <span
+    className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-black"
+    style={{ backgroundColor: getAvatarColor(user.id) }}
   >
-    <span
-      className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium text-black"
-      style={{ backgroundColor: getAvatarColor(user.id) }}
-    >
-      {user.name
-        .split(" ")
-        .map((p) => p[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase()}
-    </span>
-    <span className="hidden font-medium text-meet-text-primary sm:inline">{user.name}</span>
-  </Link>
+    {user.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
+  </span>
 )}
-        <button
-          type="button"
-          onClick={handleLogout}
-          aria-label="Se déconnecter"
-          className="flex items-center gap-1.5 rounded-full border border-meet-border bg-meet-bg-secondary/60 px-3 py-1.5 text-xs text-meet-text-secondary backdrop-blur-sm transition-all duration-200 ease-fluid hover:-translate-y-0.5 hover:border-meet-red/40 hover:bg-meet-bg-secondary hover:text-meet-text-primary hover:shadow-glow-red active:translate-y-0"
-        >
-          <LogOut size={14} />
-          Déconnexion
-        </button>
-      </div>
-
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 lg:flex-row lg:items-start lg:gap-14">
-        {/* Colonne principale — logo + actions */}
-        <div className="flex flex-1 flex-col items-center justify-center py-6 lg:sticky lg:top-10 lg:min-h-[70vh] lg:justify-center lg:py-10">
-          <div className="w-full max-w-md animate-slide-up">
-            <div className="mb-10 flex items-center justify-center gap-3 lg:justify-start">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-meet-blue to-meet-pink shadow-glow transition-transform duration-300 ease-fluid hover:rotate-6 hover:scale-105">
-                <Video size={24} className="text-white" />
-              </div>
-              <h1 className="bg-gradient-to-r from-white to-meet-text-secondary bg-clip-text text-2xl font-medium text-transparent">
-                Amphix Meet
-              </h1>
-            </div>
-
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={handleCreateRoom}
-                disabled={isCreating}
-                className="group flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-meet-blue to-meet-pink bg-[length:200%_100%] bg-left px-6 py-3 text-sm font-medium text-white shadow-glow transition-all duration-300 ease-fluid hover:scale-[1.02] hover:bg-right hover:shadow-lg active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
-              >
-                {isCreating ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Video size={18} className="transition-transform duration-300 group-hover:scale-110" />
-                )}
-                Nouvelle réunion
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowBookingModal(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-full border border-meet-border bg-meet-bg-secondary/40 px-6 py-3 text-sm font-medium text-meet-text-primary backdrop-blur-sm transition-all duration-200 ease-fluid hover:-translate-y-0.5 hover:border-meet-blue/50 hover:bg-meet-bg-secondary hover:shadow-glow active:translate-y-0"
-              >
-                <CalendarPlus size={18} />
-                Réserver une séance
-              </button>
-
-              <form onSubmit={handleJoin} className="flex gap-2">
-                <input
-                  type="text"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value)}
-                  placeholder="Entrer un code de réunion"
-                  className="flex-1 rounded-full border border-meet-border bg-meet-bg-secondary px-5 py-3 text-sm text-meet-text-primary placeholder:text-meet-text-secondary transition-all duration-200 ease-fluid focus:outline-none focus-visible:border-meet-blue focus-visible:shadow-glow focus-visible:ring-2 focus-visible:ring-meet-blue/40"
-                />
-                <button
-                  type="submit"
-                  disabled={!joinCode.trim()}
-                  className="rounded-full border border-meet-border px-5 py-3 text-sm font-medium text-meet-text-primary transition-all duration-200 ease-fluid hover:-translate-y-0.5 hover:border-meet-blue/50 hover:bg-meet-bg-secondary disabled:opacity-40 disabled:hover:translate-y-0"
-                >
-                  Rejoindre
-                </button>
-              </form>
-            </div>
-
-            {error && (
-              <p role="alert" className="mt-4 animate-slide-down text-center text-sm text-meet-yellow">
-                {error}
-              </p>
+                <span className="hidden font-medium sm:inline">{user.name}</span>
+              </Link>
             )}
+            {/* Déconnexion desktop uniquement */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Se déconnecter"
+              className="hidden items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-400 transition-all hover:bg-red-500/20 hover:text-red-300 md:flex"
+            >
+              <LogOut size={14} />
+              <span>Déconnexion</span>
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* Colonne secondaire — réservations & réunions */}
-        <div className="w-full flex-1 lg:max-w-xl lg:pt-10">
+      {/* Main */}
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-6 pb-24 sm:px-6 lg:flex-row lg:gap-12 lg:py-10 lg:pb-10">
+        {/* Colonne principale */}
+        <div className="flex flex-1 flex-col lg:sticky lg:top-24 lg:self-start">
+          <div className="mb-6">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              Bonjour,{" "}
+              <span className="bg-gradient-to-r from-[#FFD83D] to-[#F5A900] bg-clip-text text-transparent">
+                {user?.name?.split(" ")[0] ?? "Utilisateur"}
+              </span>
+            </h2>
+            <p className="mt-2 text-sm text-white/40">
+              Prêt pour votre prochaine réunion ?
+            </p>
+          </div>
+
+          {/* Actions rapides */}
+          <div className="mb-6 flex gap-2">
+            <Link
+              to="/profile"
+              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-white/70 transition-all hover:bg-white/10 hover:text-white"
+            >
+              <User size={14} />
+              Profil
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowHistory((s) => !s)}
+              className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-medium transition-all ${
+                showHistory
+                  ? "border-[#FFD83D]/30 bg-[#FFD83D]/10 text-[#FFD83D]"
+                  : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <History size={14} />
+              Historique
+            </button>
+            <Link
+              to="/settings"
+              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-white/70 transition-all hover:bg-white/10 hover:text-white"
+            >
+              <Settings size={14} />
+              Paramètres
+            </Link>
+          </div>
+
+          {/* Actions principales */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={handleCreateRoom}
+              disabled={isCreating}
+              className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#FFD83D] to-[#F5A900] px-6 py-4 text-sm font-bold text-[#2B2115] shadow-lg shadow-[#F5A900]/20 transition-all hover:shadow-xl hover:shadow-[#F5A900]/30 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+            >
+              <div className="absolute inset-0 bg-white/0 transition-colors group-hover:bg-white/15" />
+              {isCreating ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <Plus size={20} />
+              )}
+              <span>Nouvelle réunion instantanée</span>
+              <ArrowRight
+                size={18}
+                className="ml-auto opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100 -translate-x-2"
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowBookingModal(true)}
+              className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-white/90 backdrop-blur-sm transition-all hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <CalendarPlus size={20} className="text-[#FFD83D]" />
+              <span>Réserver une séance</span>
+            </button>
+
+            <form onSubmit={handleJoin} className="flex gap-2">
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value)}
+                placeholder="Code de réunion"
+                className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-white placeholder:text-white/25 outline-none transition-all focus:border-[#FFD83D]/40 focus:bg-white/10 focus:ring-2 focus:ring-[#FFD83D]/15"
+              />
+              <button
+                type="submit"
+                disabled={!joinCode.trim()}
+                className="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-white/90 transition-all hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5"
+              >
+                Rejoindre
+              </button>
+            </form>
+          </div>
+
+          {error && (
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              <X size={16} />
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Colonne secondaire */}
+        <div className="w-full lg:max-w-md">
           {isLoading && (
-            <div className="flex items-center justify-center gap-2 py-10 text-sm text-meet-text-secondary">
-              <Loader2 size={16} className="animate-spin" />
-              Chargement…
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-white/30">
+              <Loader2 size={28} className="animate-spin" />
+              <p className="text-sm">Chargement de votre espace…</p>
             </div>
           )}
 
           {!isLoading && !hasSidebarContent && (
-            <div className="hidden rounded-2xl border border-dashed border-meet-border/70 bg-meet-bg-secondary/30 px-6 py-10 text-center text-sm text-meet-text-secondary lg:block">
-              Tes réunions et réservations apparaîtront ici.
+            <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-white/10 bg-white/[0.02] px-8 py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5">
+                <Inbox size={28} className="text-white/20" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white/60">C'est calme ici</p>
+                <p className="mt-1 text-xs text-white/30">
+                  Vos réunions et réservations apparaîtront ici.
+                </p>
+              </div>
             </div>
           )}
 
           {!isLoading && (
-            <div className="space-y-6 pb-6">
+            <div className="space-y-6">
               {pendingReceivedBookings.length > 0 && (
-                <div className="animate-slide-up">
-                  <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-meet-text-secondary">
-                    <Clock size={14} className="text-meet-yellow" />
-                    Demandes en attente de ta confirmation
-                  </div>
-                  <ul className="space-y-2">
-                    {pendingReceivedBookings.map((booking, i) => (
-                      <li
-                        key={booking.id}
-                        style={{ animationDelay: `${i * 60}ms` }}
-                        className="animate-scale-in rounded-xl border border-meet-blue/30 bg-gradient-to-br from-meet-blue/10 to-transparent px-4 py-3 backdrop-blur-sm transition-shadow duration-200 hover:shadow-glow"
-                      >
-                        <p className="text-sm font-medium text-meet-text-primary">
+                <Section
+                  title="Demandes en attente"
+                  icon={<Clock size={14} className="text-amber-400" />}
+                  count={pendingReceivedBookings.length}
+                >
+                  {pendingReceivedBookings.map((booking) => (
+                    <li
+                      key={booking.id}
+                      className="rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/10 to-transparent p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-white">
+                            {booking.subject}
+                          </p>
+                          <p className="mt-0.5 text-xs text-white/40">
+                            Avec{" "}
+                            {booking.teacherId === user?.id
+                              ? booking.studentName
+                              : booking.teacherName}{" "}
+                            · {formatDate(booking.startsAt)}
+                          </p>
+                        </div>
+                        <span className="flex-shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                          En attente
+                        </span>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmBooking(booking.id)}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-500/20 px-3 py-2 text-xs font-semibold text-emerald-400 transition-all hover:bg-emerald-500/30"
+                        >
+                          <Check size={13} /> Confirmer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCancelBooking(booking.id)}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-white/50 transition-all hover:bg-white/5 hover:text-white/80"
+                        >
+                          <X size={13} /> Refuser
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </Section>
+              )}
+
+              {upcomingBookings.length > 0 && (
+                <Section
+                  title="Séances programmées"
+                  icon={<CalendarPlus size={14} className="text-[#FFD83D]" />}
+                  count={upcomingBookings.length}
+                >
+                  {upcomingBookings.map((booking) => (
+                    <li
+                      key={booking.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-white/[0.03] p-4 transition-all hover:border-white/10 hover:bg-white/[0.05]"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-white">
                           {booking.subject}
                         </p>
-                        <p className="mb-2 text-xs text-meet-text-secondary">
+                        <p className="mt-0.5 text-xs text-white/40">
                           Avec{" "}
                           {booking.teacherId === user?.id
                             ? booking.studentName
                             : booking.teacherName}{" "}
                           · {formatDate(booking.startsAt)}
                         </p>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleConfirmBooking(booking.id)}
-                            className="flex items-center gap-1 rounded-full bg-meet-green px-3 py-1 text-xs font-medium text-white transition-all duration-200 ease-fluid hover:scale-105 hover:bg-meet-green-hover hover:shadow-glow-green active:scale-95"
-                          >
-                            <Check size={12} /> Confirmer
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleCancelBooking(booking.id)}
-                            className="flex items-center gap-1 rounded-full border border-meet-border px-3 py-1 text-xs font-medium text-meet-text-secondary transition-all duration-200 ease-fluid hover:scale-105 hover:border-meet-red/40 hover:bg-meet-control hover:text-meet-text-primary active:scale-95"
-                          >
-                            <X size={12} /> Refuser
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {upcomingBookings.length > 0 && (
-                <div className="animate-slide-up">
-                  <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-meet-text-secondary">
-                    <CalendarPlus size={14} className="text-meet-blue-soft" />
-                    Séances programmées
-                  </div>
-                  <ul className="space-y-2">
-                    {upcomingBookings.map((booking, i) => (
-                      <li
-                        key={booking.id}
-                        style={{ animationDelay: `${i * 60}ms` }}
-                        className="animate-scale-in flex items-center justify-between rounded-xl border border-meet-border bg-meet-bg-secondary/60 px-4 py-3 backdrop-blur-sm transition-all duration-200 ease-fluid hover:-translate-y-0.5 hover:border-meet-blue/30 hover:shadow-panel"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-meet-text-primary">
-                            {booking.subject}
-                          </p>
-                          <p className="text-xs text-meet-text-secondary">
-                            Avec{" "}
-                            {booking.teacherId === user?.id
-                              ? booking.studentName
-                              : booking.teacherName}{" "}
-                            · {formatDate(booking.startsAt)}
-                            {booking.status === "PENDING" && " · en attente de confirmation"}
-                          </p>
-                        </div>
-                        {booking.status === "CONFIRMED" && (
-                          <button
-                            type="button"
-                            onClick={() => handleStartBooking(booking.id)}
-                            className="ml-3 flex-shrink-0 rounded-full bg-gradient-to-r from-meet-blue to-meet-pink px-4 py-1.5 text-xs font-medium text-white transition-all duration-200 ease-fluid hover:scale-105 hover:shadow-glow active:scale-95"
-                          >
-                            Rejoindre
-                          </button>
+                        {booking.status === "PENDING" && (
+                          <span className="mt-1.5 inline-block rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                            En attente
+                          </span>
                         )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                      </div>
+                      {booking.status === "CONFIRMED" && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartBooking(booking.id)}
+                          className="flex-shrink-0 rounded-xl bg-gradient-to-r from-[#FFD83D] to-[#F5A900] px-4 py-2 text-xs font-bold text-[#2B2115] shadow-lg shadow-[#F5A900]/20 transition-all hover:shadow-xl hover:shadow-[#F5A900]/30 hover:-translate-y-0.5 active:translate-y-0"
+                        >
+                          Rejoindre
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </Section>
               )}
 
               {activeMeetings.length > 0 && (
-                <MeetingSection
+                <Section
                   title="En cours"
-                  icon={<Clock size={14} className="text-meet-green" />}
-                  meetings={activeMeetings}
-                  onJoin={(joinCode) => navigate(`/room/${joinCode}`)}
-                  pulse
-                />
+                  icon={<Video size={14} className="text-emerald-400" />}
+                  count={activeMeetings.length}
+                >
+                  {activeMeetings.map((meeting) => (
+                    <li
+                      key={meeting.meetingId}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-white">
+                            {meeting.title}
+                          </p>
+                          <p className="text-xs text-white/40">
+                            {meeting.isHost ? "Vous êtes l'hôte" : `Par ${meeting.hostName}`} ·{" "}
+                            {formatDate(meeting.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/room/${meeting.joinCode}`)}
+                        className="flex-shrink-0 rounded-xl bg-gradient-to-r from-[#FFD83D] to-[#F5A900] px-4 py-2 text-xs font-bold text-[#2B2115] shadow-lg shadow-[#F5A900]/20 transition-all hover:shadow-xl hover:shadow-[#F5A900]/30 hover:-translate-y-0.5 active:translate-y-0"
+                      >
+                        Rejoindre
+                      </button>
+                    </li>
+                  ))}
+                </Section>
               )}
-              {pastMeetings.length > 0 && (
-                <MeetingSection
+
+              {showHistory && pastMeetings.length > 0 && (
+                <Section
                   title="Réunions récentes"
-                  icon={<CheckCircle2 size={14} />}
-                  meetings={pastMeetings.slice(0, 5)}
-                  onJoin={undefined}
-                />
+                  icon={<CheckCircle2 size={14} className="text-white/30" />}
+                >
+                  {pastMeetings.slice(0, 5).map((meeting) => (
+                    <li
+                      key={meeting.meetingId}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-white/70">
+                          {meeting.title}
+                        </p>
+                        <p className="text-xs text-white/25">
+                          {meeting.isHost ? "Vous êtes l'hôte" : `Par ${meeting.hostName}`} ·{" "}
+                          {formatDate(meeting.createdAt)}
+                        </p>
+                      </div>
+                      <span className="flex-shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-white/30">
+                        Terminée
+                      </span>
+                    </li>
+                  ))}
+                </Section>
               )}
             </div>
           )}
+        </div>
+      </main>
+
+      {/* Footer mobile — déconnexion rouge */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/5 bg-[#0a0a0a]/90 backdrop-blur-xl md:hidden">
+        <div className="mx-auto flex max-w-6xl items-center justify-around px-4 py-3">
+          <button
+            type="button"
+            onClick={() => setShowHistory((s) => !s)}
+            className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-colors ${
+              showHistory ? "text-[#FFD83D]" : "text-white/40"
+            }`}
+          >
+            <History size={20} />
+            Historique
+          </button>
+          <Link
+            to="/profile"
+            className="flex flex-col items-center gap-1 text-[10px] font-medium text-white/40 transition-colors hover:text-white/70"
+          >
+            <User size={20} />
+            Profil
+          </Link>
+          <Link
+            to="/settings"
+            className="flex flex-col items-center gap-1 text-[10px] font-medium text-white/40 transition-colors hover:text-white/70"
+          >
+            <Settings size={20} />
+            Paramètres
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex flex-col items-center gap-1 text-[10px] font-medium text-red-400 transition-colors hover:text-red-300"
+          >
+            <LogOut size={20} />
+            Déconnexion
+          </button>
         </div>
       </div>
 
@@ -349,57 +519,32 @@ export function Home() {
   );
 }
 
-interface MeetingSectionProps {
+/* ─── Sous-composants ─── */
+
+interface SectionProps {
   title: string;
   icon: React.ReactNode;
-  meetings: MeetingListItem[];
-  onJoin?: (joinCode: string) => void;
-  pulse?: boolean;
+  count?: number;
+  children: React.ReactNode;
 }
 
-function MeetingSection({ title, icon, meetings, onJoin, pulse }: MeetingSectionProps) {
+function Section({ title, icon, count, children }: SectionProps) {
   return (
-    <div className="animate-slide-up">
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-meet-text-secondary">
-        {icon}
-        {title}
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {icon}
+          <span className="text-xs font-semibold uppercase tracking-wider text-white/50">
+            {title}
+          </span>
+        </div>
+        {count !== undefined && (
+          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-bold text-white/40">
+            {count}
+          </span>
+        )}
       </div>
-      <ul className="space-y-2">
-        {meetings.map((meeting, i) => (
-          <li
-            key={meeting.meetingId}
-            style={{ animationDelay: `${i * 60}ms` }}
-            className="animate-scale-in flex items-center justify-between rounded-xl border border-meet-border bg-meet-bg-secondary/60 px-4 py-3 backdrop-blur-sm transition-all duration-200 ease-fluid hover:-translate-y-0.5 hover:border-meet-blue/30 hover:shadow-panel"
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              {pulse && (
-                <span className="relative flex h-2 w-2 flex-shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-meet-green opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-meet-green" />
-                </span>
-              )}
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-meet-text-primary">
-                  {meeting.title}
-                </p>
-                <p className="text-xs text-meet-text-secondary">
-                  {meeting.isHost ? "Organisée par vous" : `Par ${meeting.hostName}`} ·{" "}
-                  {formatDate(meeting.createdAt)}
-                </p>
-              </div>
-            </div>
-            {onJoin && (
-              <button
-                type="button"
-                onClick={() => onJoin(meeting.joinCode)}
-                className="ml-3 flex-shrink-0 rounded-full bg-gradient-to-r from-meet-blue to-meet-pink px-4 py-1.5 text-xs font-medium text-white transition-all duration-200 ease-fluid hover:scale-105 hover:shadow-glow active:scale-95"
-              >
-                Rejoindre
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+      <ul className="space-y-2">{children}</ul>
     </div>
   );
 }
