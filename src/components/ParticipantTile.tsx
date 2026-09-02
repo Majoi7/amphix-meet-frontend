@@ -21,7 +21,6 @@ interface ParticipantTileProps {
   className?: string;
 }
 
-/** Métadonnées JSON attachées au participant côté serveur lors de la génération du token LiveKit. */
 interface ParticipantMetadata {
   avatarUrl?: string;
 }
@@ -37,16 +36,14 @@ function parseAvatarUrl(metadata: string | undefined): string | undefined {
 }
 
 /**
- * Tuile d'un participant, calquée sur le rendu Google Meet :
- * - Caméra : ratio 16/9, coins arrondis.
- * - Nom en texte simple sur dégradé bas (pas de pastille pleine) — style
- *   Meet établi en Session 8, ne pas revenir à une pastille sans raison.
- * - UN SEUL badge micro coupé, en haut à droite (pas de doublon avec le
- *   nom).
+ * Tuile d'un participant :
+ * - Caméra : ratio CARRÉ (1/1), coins arrondis.
+ * - Nom en texte simple sur dégradé bas.
+ * - UN SEUL badge micro coupé, en haut à droite.
  * - Qualité réseau : point discret, affiché seulement si dégradée.
  * - Screen share : object-contain, pas de ratio forcé.
- * - Caméra coupée : photo de profil si disponible via les métadonnées
- *   du participant, sinon initiales colorées (fallback).
+ * - Caméra coupée : tuile entière remplie de la couleur du participant,
+ *   avatar (photo ou initiales) affiché en rond par-dessus, contrasté.
  */
 export function ParticipantTile({
   trackRef,
@@ -71,7 +68,7 @@ export function ParticipantTile({
 
   const containerClasses = [
     "group relative overflow-hidden bg-meet-tile transition-shadow duration-150",
-    !isScreenShare && "aspect-video",
+    !isScreenShare && "aspect-square",
     "rounded-2xl",
     isSpeaking && !isScreenShare && "ring-2 ring-meet-blue",
     className,
@@ -92,18 +89,20 @@ export function ParticipantTile({
       {hasVideo ? (
         <VideoTrack trackRef={trackRef as TrackReference} className={videoClasses} />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#3c4c73] to-[#1f2536]">
+        <div
+          className="relative flex h-full w-full items-center justify-center"
+          style={{ backgroundColor: avatarColor }}
+        >
+          {/* Voile sombre pour garder le nom/les badges lisibles sur une couleur claire */}
+          <div className="absolute inset-0 bg-black/20" />
           {avatarUrl ? (
             <img
               src={avatarUrl}
               alt=""
-              className="h-20 w-20 rounded-full object-cover shadow-lg sm:h-28 sm:w-28"
+              className="relative h-16 w-16 rounded-full object-cover shadow-lg ring-4 ring-white/25 sm:h-24 sm:w-24"
             />
           ) : (
-            <div
-              className="flex h-20 w-20 items-center justify-center rounded-full text-2xl font-medium text-meet-bg shadow-lg sm:h-28 sm:w-28 sm:text-4xl"
-              style={{ backgroundColor: avatarColor }}
-            >
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/90 text-xl font-medium shadow-lg ring-4 ring-white/25 sm:h-24 sm:w-24 sm:text-3xl" style={{ color: avatarColor }}>
               {initials}
             </div>
           )}
@@ -112,7 +111,6 @@ export function ParticipantTile({
 
       {!isScreenShare && (
         <>
-          {/* Dégradé bas pour la lisibilité du nom, sans pastille pleine — style Meet */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/60 to-transparent" />
           <span className="absolute bottom-2.5 left-3 text-sm font-medium text-white drop-shadow">
             {displayName}
@@ -121,13 +119,12 @@ export function ParticipantTile({
         </>
       )}
 
-      {/* Badge micro coupé — UN SEUL, coin haut-droit de la tuile */}
       {!isScreenShare && isMuted && (
         <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-meet-blue/90 shadow">
           <MicOff size={14} className="text-white" />
         </div>
       )}
-            {/* Bouton épingle — affiché seulement si onTogglePin est fourni */}
+
       {!isScreenShare && onTogglePin && (
         <button
           type="button"
@@ -140,7 +137,6 @@ export function ParticipantTile({
         </button>
       )}
 
-      {/* Qualité réseau — affichée seulement si dégradée */}
       {!isScreenShare && quality !== ConnectionQuality.Excellent && (
         <div
           className="absolute bottom-2.5 right-3 h-2.5 w-2.5 rounded-full shadow"
@@ -158,7 +154,6 @@ export function ParticipantTile({
         />
       )}
 
-      {/* Badge "Vous présentez" uniquement pour screen share local */}
       {isScreenShare && isLocal && (
         <div className="absolute left-3 top-3 z-10 rounded bg-meet-blue px-2 py-0.5 text-xs font-medium text-white">
           Vous présentez

@@ -1,45 +1,59 @@
 import { useEffect, useRef } from "react";
 import type { Participant } from "livekit-client";
-import { useParticipants } from "@livekit/components-react";
+import { useParticipants, useLocalParticipant } from "@livekit/components-react";
 import { useToast } from "../components/ToastProvider";
 
 /**
  * Compare la liste des participants entre deux rendus pour détecter les
- * arrivées et départs, et pousse une notification discrète pour chacun.
- * Ignore le tout premier rendu (sinon on notifierait pour tout le monde
- * déjà présent au moment où on rejoint).
+ * arrivées, et pousse une notification discrète pour chacune.
+ *
+ * Deux garde-fous importants :
+ * 1. On attend que NOTRE PROPRE identité apparaisse dans la liste avant
+ *    de fixer la référence de départ. useParticipants() peut renvoyer une
+ *    liste vide/partielle le temps que la connexion LiveKit se stabilise
+ *    — si on prenait cette liste incomplète comme référence, le rendu
+ *    suivant (une fois la vraie liste reçue) ferait passer TOUT le monde,
+ *    nous y compris, pour "nouveau".
+ * 2. On exclut explicitement notre propre identité des notifications,
+ *    en plus du point 1, par sécurité.
  */
 export function useParticipantNotifications(): void {
   const participants = useParticipants();
+  const { localParticipant } = useLocalParticipant();
   const { pushToast } = useToast();
   const previousParticipants = useRef<Map<string, string> | null>(null);
+  const hasBaseline = useRef(false);
 
   useEffect(() => {
     const currentParticipants = new Map(
       participants.map((p) => [p.identity, displayName(p)])
     );
 
-    if (previousParticipants.current === null) {
-      previousParticipants.current = currentParticipants;
+    const myIdentity = localParticipant?.identity;
+
+    // Connexion pas encore stabilisée — on attend le rendu où on se voit
+    // nous-même dans la liste avant de fixer quoi que ce soit.
+    if (!myIdentity || !currentParticipants.has(myIdentity)) {
       return;
     }
 
-    const previous = previousParticipants.current;
+    if (!hasBaseline.current) {
+      previousParticipants.current = currentParticipants;
+      hasBaseline.current = true;
+      return;
+    }
+
+    const previous = previousParticipants.current!;
 
     for (const [identity, name] of currentParticipants) {
+      if (identity === myIdentity) continue; // jamais de notif pour soi-même
       if (!previous.has(identity)) {
         pushToast(`${name} a rejoint la réunion`);
       }
     }
 
-    for (const [identity, name] of previous) {
-      if (!currentParticipants.has(identity)) {
-        pushToast(`${name} a quitté la réunion`);
-      }
-    }
-
     previousParticipants.current = currentParticipants;
-  }, [participants, pushToast]);
+  }, [participants, localParticipant, pushToast]);
 }
 
 function displayName(participant: Participant): string {

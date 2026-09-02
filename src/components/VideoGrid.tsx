@@ -158,6 +158,10 @@ export function VideoGrid() {
 
   /* ═══════════════════════════════════════════════════════════════
      DESKTOP
+     Disposition en lignes fixes (pas une grille CSS auto) : 2→1 ligne
+     de 2, 3→1 ligne de 3, 4→2 lignes de 2, 5→3 haut/2 bas, 6→3/3.
+     Au-delà de 6, on garde 5 vraies tuiles + un gros indicateur "+N"
+     à la dernière position (toujours 3 haut / 3 bas au total).
      ═══════════════════════════════════════════════════════════════ */
   if (count === 1) {
     return (
@@ -173,27 +177,102 @@ export function VideoGrid() {
     );
   }
 
-  const gridColsClass = getGridColsClass(count);
+  const { rows, tileSize, overflowCount } = getDesktopRows(count);
+  let trackIndex = 0;
 
   return (
-    <div className="flex h-full w-full items-center justify-center overflow-hidden p-4 sm:p-8">
-      <div
-        className={`grid w-full max-w-7xl gap-3 sm:gap-4 ${gridColsClass} auto-rows-fr`}
-        style={{ maxHeight: "100%" }}
-      >
-        {cameraTracks.map((trackRef) => (
-          <div key={trackRef.participant.identity} className="overflow-hidden rounded-2xl">
-            <ParticipantTile
-              trackRef={trackRef}
-              isLocal={trackRef.participant.isLocal}
-              onTogglePin={() => togglePin(trackRef.participant.identity)}
-              className="h-full w-full"
-            />
+    <div className="flex h-full w-full items-center justify-center overflow-hidden p-4 sm:p-6">
+      <div className="flex flex-col gap-1 sm:gap-1.5">
+        {rows.map((rowLength, rowIdx) => (
+          <div key={rowIdx} className="flex gap-1 sm:gap-1.5">
+            {Array.from({ length: rowLength }).map((_, cellIdx) => {
+              const isLastCell =
+                rowIdx === rows.length - 1 && cellIdx === rowLength - 1;
+
+              if (isLastCell && overflowCount > 0) {
+                return (
+                  <div
+                    key="overflow"
+                    className="flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-meet-tile"
+                    style={{ width: tileSize, height: tileSize }}
+                  >
+                    <span className="text-3xl font-semibold text-white sm:text-4xl">
+                      +{overflowCount}
+                    </span>
+                  </div>
+                );
+              }
+
+              const trackRef = cameraTracks[trackIndex];
+              trackIndex += 1;
+              return (
+                <div
+                  key={trackRef.participant.identity}
+                  className="aspect-square overflow-hidden rounded-2xl"
+                  style={{ width: tileSize, height: tileSize }}
+                >
+                  <ParticipantTile
+                    trackRef={trackRef}
+                    isLocal={trackRef.participant.isLocal}
+                    className="h-full w-full"
+                  />
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+/**
+ * Détermine la disposition en lignes fixes + la taille des tuiles selon
+ * le nombre de participants. Contrairement à une grille CSS classique,
+ * on contrôle explicitement combien de tuiles par ligne pour respecter
+ * la règle métier (3/2/2+2/3+2/3+3) plutôt que de laisser le navigateur
+ * décider. Au-delà de 6, les tuiles en trop sont remplacées par un seul
+ * indicateur "+N" à la dernière position.
+ */
+function getDesktopRows(count: number): {
+  rows: number[];
+  tileSize: number;
+  overflowCount: number;
+} {
+  const overflowCount = count > 6 ? count - 5 : 0;
+  const visibleTotal = overflowCount > 0 ? 6 : count; // 5 vraies tuiles + 1 indicateur = 6
+
+  const sizeByTotal: Record<number, number> = {
+    2: 280,
+    3: 240,
+    4: 220,
+    5: 200,
+    6: 180,
+  };
+  const tileSize = sizeByTotal[visibleTotal] ?? 160;
+
+  let rows: number[];
+  switch (visibleTotal) {
+    case 2:
+      rows = [2];
+      break;
+    case 3:
+      rows = [3];
+      break;
+    case 4:
+      rows = [2, 2];
+      break;
+    case 5:
+      rows = [3, 2];
+      break;
+    case 6:
+      rows = [3, 3];
+      break;
+    default:
+      rows = [visibleTotal];
+  }
+
+  return { rows, tileSize, overflowCount };
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -337,12 +416,4 @@ function PinnedMobileLayout({ pinnedTrack, others, onTogglePin }: PinnedLayoutPr
       )}
     </div>
   );
-}
-
-function getGridColsClass(count: number): string {
-  if (count <= 1) return "grid-cols-1";
-  if (count === 2) return "grid-cols-2";
-  if (count <= 4) return "grid-cols-2";
-  if (count <= 6) return "grid-cols-3";
-  return "grid-cols-4";
 }
