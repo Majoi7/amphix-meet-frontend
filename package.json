@@ -12,6 +12,7 @@
   "dependencies": {
     "@livekit/components-react": "^2.6.7",
     "@livekit/components-styles": "^1.1.4",
+    "jsxgraph": "^1.13.2",
     "livekit-client": "^2.7.4",
     "lucide-react": "^0.441.0",
     "react": "^18.3.1",

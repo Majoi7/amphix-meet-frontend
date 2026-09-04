@@ -7,6 +7,7 @@ import { EmbedRoomPage } from "./pages/EmbedRoom";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Profile } from "./pages/Profile";
+import { MathSpace } from "./pages/MathSpace";
 
 export function App() {
   return (
@@ -45,6 +46,14 @@ export function App() {
     </RequireAuth>
   }
 />
+                <Route
+                  path="/room/:roomId/math"
+                  element={
+                    <RequireAuth>
+                      <MathSpace />
+                    </RequireAuth>
+                  }
+                />
               </Routes>
             </AuthProvider>
           }

@@ -58,6 +58,10 @@ export function RoomPage() {
       pendingPrefsRef.current = prefs;
       try {
         const result = await joinMeeting(roomId);
+        console.debug("[Room] joinMeeting result received, waiting:", result.waiting);
+        if (!result.waiting) {
+          console.debug("[Room] Token received, length:", result.token?.length ?? 0);
+        }
         if (result.waiting) {
           setWaitingLobbyId(result.lobbyRequestId);
         } else {
@@ -70,7 +74,8 @@ export function RoomPage() {
             endsAt: result.endsAt,
           });
         }
-      } catch {
+      } catch (err) {
+        console.error("[Room] joinMeeting error:", err);
         setError(
           "Impossible de rejoindre la réunion. Vérifie ta connexion et réessaie."
         );
@@ -91,6 +96,7 @@ export function RoomPage() {
         if (cancelled) return;
 
         if (status.status === "APPROVED") {
+          console.debug("[Room] Lobby approved, token received, length:", status.token?.length ?? 0);
           clearInterval(interval);
           setWaitingLobbyId(null);
           const prefs = pendingPrefsRef.current;
@@ -146,6 +152,15 @@ export function RoomPage() {
 
   function handleRoomError(err: Error) {
     console.error("[LiveKitRoom] Erreur de connexion:", err);
+    console.error("[LiveKitRoom] Erreur message:", err.message);
+    console.error("[LiveKitRoom] Erreur stack:", err.stack);
+    // Try to extract LiveKit specific info if available
+    if (err instanceof Object && 'code' in err) {
+      console.error("[LiveKitRoom] Erreur code:", (err as any).code);
+    }
+    if (err instanceof Object && 'reason' in err) {
+      console.error("[LiveKitRoom] Erreur reason:", (err as any).reason);
+    }
     hadErrorRef.current = true;
     setConnection(null);
     setError(
