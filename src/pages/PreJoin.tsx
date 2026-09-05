@@ -40,6 +40,7 @@ export function PreJoin({ onJoin, isJoining, error }: PreJoinProps) {
         <DevicePreview
   displayName={user?.name ?? ""}
   avatarUrl={user?.avatarUrl ?? undefined}
+  identity={user?.id ?? ""}
   onDeviceStateChange={setDeviceState}
 />
       </div>

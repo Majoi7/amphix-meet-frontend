@@ -5,6 +5,7 @@ import { getAvatarColor } from "../lib/avatarColor";
 interface DevicePreviewProps {
   displayName: string;
   avatarUrl?: string;                 // ← ajouté
+  identity?: string;                  // ← nouveau
 
   onDeviceStateChange: (state: { micEnabled: boolean; cameraEnabled: boolean }) => void;
 }
@@ -14,7 +15,7 @@ interface DevicePreviewProps {
  * immédiatement une impression de produit professionnel — l'utilisateur
  * voit à quoi il ressemblera avant d'entrer dans la salle.
  */
-export function DevicePreview({ displayName, avatarUrl, onDeviceStateChange }: DevicePreviewProps) {
+export function DevicePreview({ displayName, avatarUrl, identity, onDeviceStateChange }: DevicePreviewProps) {
   const { videoRef, micEnabled, cameraEnabled, toggleMic, toggleCamera, error } =
     useMediaPreview();
 
@@ -52,7 +53,7 @@ export function DevicePreview({ displayName, avatarUrl, onDeviceStateChange }: D
             ) : (
               <div
                 className="flex h-20 w-20 items-center justify-center rounded-full text-2xl font-medium text-meet-bg"
-                style={{ backgroundColor: getAvatarColor(displayName) }}
+                style={{ backgroundColor: getAvatarColor(identity ?? displayName) }}
               >
                 {initials}
               </div>

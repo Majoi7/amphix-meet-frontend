@@ -4,6 +4,7 @@ import {
   LiveKitRoom,
   useParticipants,
   useChat,
+  useLocalParticipant,
   StartAudio,
   RoomAudioRenderer,
 } from "@livekit/components-react";
@@ -21,13 +22,13 @@ import { ChatNotification } from "../components/ChatNotification";
 import { ToastProvider } from "../components/ToastProvider";
 import { useParticipantNotifications } from "../hooks/useParticipantNotifications";
 import { useLobbyRequests } from "../hooks/useLobbyRequests";
-import { useHandRaise } from "../hooks/useHandRaise";
-import { useHandRaiseSound } from "../hooks/useHandRaiseSound";
+import { useHandRaise, type HandPayload } from "../hooks/useHandRaise";
 import type { DevicePreferences } from "../types";
 import { ConnectionBanner } from "../components/ConnectionBanner";
 import { useReactions } from "../hooks/useReactions";
 import { ReactionOverlay } from "../components/ReactionOverlay";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { HandRaiseNotification } from "../components/HandRaiseNotification";
 type PanelState = "none" | "chat" | "participants";
 const LOBBY_POLL_INTERVAL_MS = 3000;
 
@@ -231,22 +232,56 @@ function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLa
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
   const [meetingStartTime] = useState(() => Date.now());
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [handRaiseNotifications, setHandRaiseNotifications] = useState<Array<{id: string; name: string}>>([]);
+  const lastHandRaiseTimeRef = useRef<Map<string, number>>(new Map());
+  const lastSoundPlayRef = useRef<Map<string, number>>(new Map());
   const handleScreenTap = () => {
   setControlsVisible(prev => !prev);
 };
   const participants = useParticipants();
   const { chatMessages } = useChat();
   const { requests: lobbyRequests, refresh: refreshLobby } = useLobbyRequests(roomId, isHost);
+  const { localParticipant } = useLocalParticipant();
 
 // Dans ton composant :
-  const { raisedHands, isHandRaised, toggleHand } = useHandRaise();
-  const playHandSound = useHandRaiseSound();
+  const handleHandRaise = useCallback((payload: HandPayload) => {
+    // Callback when a hand raise event is received (only for raised hands)
+    if (!payload.raised) return;
+
+    const now = Date.now();
+    const lastTime = lastHandRaiseTimeRef.current.get(payload.identity) ?? 0;
+    // Prevent spam: only allow one notification per identity every 2 seconds
+    if (now - lastTime < 2000) {
+      return;
+    }
+    lastHandRaiseTimeRef.current = new Map(lastHandRaiseTimeRef.current).set(payload.identity, now);
+
+    // Play sound for others, not self with deduplication
+    if (payload.identity !== localParticipant?.identity) {
+      // Check if we've already played sound for this identity recently (to prevent duplicates from same event)
+      const lastSoundTime = lastSoundPlayRef.current.get(payload.identity) ?? 0;
+      if (now - lastSoundTime > 100) { // Only play if at least 100ms since last sound for this identity
+        lastSoundPlayRef.current.set(payload.identity, now);
+        const audio = new Audio("/Meet.mp3");
+        audio.play().catch(_ => {
+          // Handle error silently to avoid unhandled promise rejection
+        });
+      }
+    }
+
+    // Add notification
+    setHandRaiseNotifications(prev => [
+      ...prev,
+      { id: Math.random().toString(36), name: payload.name || payload.identity }
+    ]);
+  }, [localParticipant]);
+
+  const { raisedHands, isHandRaised, toggleHand } = useHandRaise(handleHandRaise);
   const { reactions, sendReaction } = useReactions();
   const isMobile = useIsMobile();
 
   const handleToggleHand = () => {
     toggleHand();
-    playHandSound();
   };
 
   useParticipantNotifications();
@@ -262,6 +297,10 @@ function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLa
     });
   }
 
+  // Remove notification after it's done animating (handled by the component itself calling onRemove)
+  const removeNotification = useCallback((id: string) => {
+    setHandRaiseNotifications(prev => prev.filter(n => n.id !== id));
+  }, []); // Only depends on stable setHandRaiseNotifications setter
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-meet-bg">
@@ -338,6 +377,18 @@ function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLa
 
       {/* Notifications chat flottantes */}
       <ChatNotification />
+
+      {/* Hand raise notifications (turtle) */}
+      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col-reverse space-y-3">
+        {handRaiseNotifications.map((notification) => (
+          <HandRaiseNotification
+            key={notification.id}
+            id={notification.id}
+            name={notification.name}
+            onRemove={removeNotification}
+          />
+        ))}
+      </div>
 
       <MeetControls
         roomId={roomId}

@@ -7,7 +7,7 @@
  * de confusion visuelle.
  */
 const AVATAR_PALETTE = [
-  "#8ab4f8", // bleu
+  "#8ab4f8", // bleu clair
   "#c58af9", // violet
   "#78d9ec", // cyan
   "#fdd663", // ambre
@@ -15,6 +15,14 @@ const AVATAR_PALETTE = [
   "#a8dab5", // vert doux
   "#fcad70", // orange
   "#b39ddb", // lavande
+  "#ff8a80", // rouge pâle
+  "#8bc34a", // vert lime
+  "#4fc3f7", // bleu ciel
+  "#ce93d8", // lilas
+  "#ffb74d", // orange foncé
+  "#a1887f", // brun grisâtre
+  "#90a4ae", // bleu gris
+  "#e57373", // rouge doux
 ];
 
 export function getAvatarColor(identity: string): string {

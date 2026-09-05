@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useDataChannel, useLocalParticipant } from "@livekit/components-react";
 
-interface HandPayload {
+export interface HandPayload {
   type: "hand";
   identity: string;
   name: string;
   raised: boolean;
 }
 
-export function useHandRaise() {
+export function useHandRaise(onHandRaise?: (payload: HandPayload) => void) {
   const { send, message } = useDataChannel("hand-raise");
   const { localParticipant } = useLocalParticipant();
   const [raisedHands, setRaisedHands] = useState<Map<string, string>>(new Map());
@@ -29,11 +29,14 @@ export function useHandRaise() {
         if (data.identity === localParticipant?.identity) {
           setIsHandRaised(data.raised);
         }
+        if (onHandRaise && data.raised) {
+          onHandRaise(data);
+        }
       }
     } catch {
       // ignore
     }
-  }, [message, localParticipant]);
+  }, [message, localParticipant, onHandRaise]);
 
   const toggleHand = useCallback(() => {
     const next = !isHandRaised;
@@ -45,9 +48,9 @@ export function useHandRaise() {
       raised: next,
     };
     send(
-  new TextEncoder().encode(JSON.stringify(payload)),
-  { reliable: true }
-);
+      new TextEncoder().encode(JSON.stringify(payload)),
+      { reliable: true }
+    );
   }, [isHandRaised, localParticipant, send]);
 
   return { raisedHands, isHandRaised, toggleHand };
