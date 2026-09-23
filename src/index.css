@@ -76,6 +76,69 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Ouverture des menus contextuels (pin, débordement) — courte et discrète */
+@keyframes menu-pop {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-menu-pop {
+  animation: menu-pop 120ms cubic-bezier(0.2, 0, 0, 1);
+  transform-origin: top left;
+}
+
+/* Apparition / disparition de la vignette caméra flottante */
+@keyframes self-view-in {
+  from { opacity: 0; transform: scale(0.9) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-self-view-in {
+  animation: self-view-in 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Bouton d'épinglage posé au centre d'une tuile.
+   Sur un appareil qui sait survoler (souris), il reste discret au repos et
+   se révèle au survol de la tuile ou au focus clavier. Sur écran tactile, où
+   le survol n'existe pas, il reste visible en permanence : c'est la seule
+   façon d'y accéder. Un simple `sm:` ne conviendrait pas — une tablette large
+   est tactile ET au-dessus du breakpoint. */
+.pin-button {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pin-button {
+    opacity: 0;
+  }
+  .group:hover .pin-button,
+  .pin-button:focus-visible,
+  .pin-button.pin-button-active {
+    opacity: 1;
+  }
+}
+
+/* Barre de défilement du bandeau secondaire — fine et discrète.
+   Une barre native (~15 px) rognerait d'autant les tuiles du bandeau. */
+.strip-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+.strip-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.strip-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.strip-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+}
+.strip-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
 .animate-pulse-dot {
   animation: pulse-dot 1.4s ease-in-out infinite;
 }

@@ -1,0 +1,663 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Espace mathématique Amphix — recettes de composants.
+
+   CE QUI EST PARTAGÉ, CE QUI NE L'EST PAS
+   Les COULEURS ne sont pas définies ici : elles viennent de
+   `src/styles/theme.css` (jetons `--app-*`), le même fichier que celui
+   utilisé par l'espace d'administration. Il n'existe donc qu'un seul
+   thème dans l'application, et basculer clair/sombre d'un côté bascule
+   l'autre.
+
+   Ce fichier ne contient que des RECETTES de mise en page (surfaces,
+   boutons, touches, onglets) exprimées avec ces jetons. Elles portent un
+   préfixe `app-` pour ne croiser aucune classe `dash-*` ni aucune classe
+   `meet-*` : la salle de réunion ne peut pas être affectée.
+
+   La page importe `theme.css` AVANT ce fichier (`MathSpace.tsx`).
+   ══════════════════════════════════════════════════════════════════════ */
+
+.app-shell {
+  background-color: var(--app-bg);
+  color: var(--app-text);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Surfaces
+   ══════════════════════════════════════════════════════════════════ */
+
+.app-card {
+  background-color: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  box-shadow: var(--app-shadow);
+}
+
+.app-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.app-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--app-text);
+}
+
+.app-card-desc {
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--app-text-subtle);
+}
+
+.app-card-body {
+  padding: 16px;
+}
+
+.app-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Boutons — mêmes trois niveaux que l'administration
+   ══════════════════════════════════════════════════════════════════ */
+
+.app-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease,
+    color 120ms ease, opacity 120ms ease;
+}
+
+.app-btn:disabled,
+.app-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.app-btn-primary {
+  background-color: var(--app-accent);
+  color: #1a1200;
+  font-weight: 600;
+}
+.app-btn-primary:not(:disabled):hover {
+  background-color: var(--app-accent-strong);
+  color: #ffffff;
+}
+.app-theme[data-theme="dark"] .app-btn-primary:not(:disabled):hover {
+  background-color: #ffe066;
+  color: #1a1200;
+}
+
+.app-btn-secondary {
+  background-color: var(--app-surface);
+  border-color: var(--app-border-strong);
+  color: var(--app-text);
+}
+.app-btn-secondary:not(:disabled):hover {
+  background-color: var(--app-surface-2);
+}
+
+.app-btn-ghost {
+  background-color: transparent;
+  color: var(--app-text-muted);
+}
+.app-btn-ghost:not(:disabled):hover {
+  background-color: var(--app-surface-2);
+  color: var(--app-text);
+}
+
+.app-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  color: var(--app-text-muted);
+  background-color: transparent;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.app-icon-btn:hover {
+  background-color: var(--app-surface-2);
+  color: var(--app-text);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Champs
+   ══════════════════════════════════════════════════════════════════ */
+
+.app-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--app-border-strong);
+  background-color: var(--app-surface);
+  color: var(--app-text);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.app-input::placeholder {
+  color: var(--app-text-subtle);
+}
+.app-input:focus {
+  outline: none;
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 3px var(--app-accent-soft);
+}
+.app-input[aria-invalid="true"] {
+  border-color: var(--app-red);
+}
+.app-input[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px var(--app-red-soft);
+}
+
+.app-input-sm {
+  height: 36px;
+  font-size: 14px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Onglets d'outils — un vrai `tablist` : une seule tabulation pour
+   entrer dans le groupe, les flèches pour changer d'outil.
+   ══════════════════════════════════════════════════════════════════ */
+
+.app-tablist {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 11px;
+  background-color: var(--app-surface-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.app-tablist::-webkit-scrollbar {
+  display: none;
+}
+
+.app-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--app-text-muted);
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.app-tab:hover {
+  color: var(--app-text);
+}
+.app-tab[aria-selected="true"] {
+  background-color: var(--app-surface);
+  color: var(--app-text);
+  font-weight: 600;
+  box-shadow: var(--app-shadow);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Barre d'outils — le vocabulaire de la géométrie, rendu lisible.
+
+   Elle est parente de `.app-tablist` : même forme, même rayon, même
+   hauteur de commande. La différence est ce qu'elle désigne — des
+   onglets changent de MODE, une barre d'outils change de GESTE. Deux
+   recettes distinctes pour deux usages distincts, donc, mais une seule
+   échelle visuelle : c'est ce qui donne à l'espace son air d'ensemble.
+   ══════════════════════════════════════════════════════════════════ */
+
+.app-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 11px;
+  border: 1px solid var(--app-border);
+  background-color: var(--app-surface-2);
+}
+
+.app-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--app-text-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease,
+    border-color 120ms ease;
+}
+
+.app-tool:hover {
+  background-color: var(--app-surface-3);
+  color: var(--app-text);
+}
+
+/* L'outil actif se distingue par TROIS signaux discrets — fond remonté,
+   bord ambré, graisse accrue — et non par un aplat criard. Il reste
+   lisible en clair comme en sombre, et ne capte pas le regard au point
+   de faire oublier le graphe. */
+.app-tool[aria-pressed="true"] {
+  background-color: var(--app-surface);
+  border-color: var(--app-accent);
+  color: var(--app-text);
+  font-weight: 600;
+  box-shadow: var(--app-shadow);
+}
+
+/* BARRE D'OUTILS DÉFILANTE — sur petit écran uniquement.
+
+   Les six outils de géométrie portent chacun leur libellé. Dans 360 px,
+   ils passaient à la ligne : trois rangées, ≈ 116 px de haut, pour une
+   barre qui ne fait que choisir un geste. Elle mangeait la hauteur que le
+   graphe venait de récupérer (voir `.app-graph`), et la rangée du bas
+   pouvait se retrouver hors de l'écran.
+
+   Elle défile donc horizontalement, sur une seule rangée. Les libellés
+   sont CONSERVÉS : un doigt ne survole pas, il n'y a pas d'infobulle au
+   toucher, et une rangée d'icônes nues obligerait à deviner. C'est la
+   barre qui cède, pas le texte.
+
+   Le défilement est invisible (`scrollbar-width`, puis le pseudo-élément
+   WebKit) : une barre de défilement de 15 px sur une bande de 52 px
+   mangerait près d'un tiers de la hauteur, et le défilement se découvre
+   au doigt en poussant la rangée — la rangée suivante, à demi visible au
+   bord, le dit déjà. L'outil actif est ramené dans le champ par
+   `revealHorizontally`, donc rien ne peut être activé hors de l'écran.
+
+   `overscroll-behavior-x: contain` empêche le geste horizontal, une fois
+   la barre en bout de course, d'être repris par la page ou par le geste
+   « précédent » du navigateur. */
+.app-toolbar-scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.app-toolbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Cibles portées à 44 px : c'est le seuil de la recommandation AAA
+   (WCAG 2.5.5). Les 32 px du bureau suffisent à une souris, pas à un
+   doigt — et la hauteur est ici peu coûteuse, la barre n'ayant qu'une
+   rangée. */
+.app-toolbar-scroll .app-tool {
+  height: 44px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Clavier mathématique
+   ══════════════════════════════════════════════════════════════════ */
+
+.app-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 42px;
+  padding: 0 4px;
+  border-radius: 9px;
+  border: 1px solid var(--app-border);
+  background-color: var(--app-surface);
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color 100ms ease, border-color 100ms ease,
+    transform 100ms ease;
+}
+.app-key:hover {
+  background-color: var(--app-surface-2);
+  border-color: var(--app-border-strong);
+}
+.app-key:active {
+  transform: translateY(1px);
+}
+
+/* Touches d'opérateur : l'ambre de l'application, en remplissage doux. */
+.app-key-op {
+  background-color: var(--app-accent-soft);
+  border-color: transparent;
+  color: var(--app-accent-strong);
+  font-weight: 600;
+}
+
+.app-key-util {
+  background-color: var(--app-surface-2);
+  color: var(--app-text-muted);
+  font-size: 13px;
+}
+
+/* Touches de fonction : plus compactes, sur plusieurs lignes. */
+.app-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--app-border);
+  background-color: var(--app-surface);
+  color: var(--app-text-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 100ms ease, color 100ms ease,
+    border-color 100ms ease;
+}
+.app-chip:hover {
+  background-color: var(--app-surface-2);
+  border-color: var(--app-border-strong);
+  color: var(--app-text);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Résultat
+   ══════════════════════════════════════════════════════════════════ */
+
+.app-result {
+  border: 1px solid var(--app-border);
+  border-radius: 11px;
+  background-color: var(--app-surface-2);
+}
+
+.app-result-exact {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--app-text);
+  word-break: break-word;
+}
+
+.app-result-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--app-border);
+}
+
+.app-result-label {
+  min-width: 108px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+}
+
+.app-result-value {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-text);
+  word-break: break-word;
+}
+
+.app-mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 0;
+  color: var(--app-text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  background-color: var(--app-red-soft);
+  color: var(--app-red);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Étiquettes
+   ══════════════════════════════════════════════════════════════════ */
+
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app-badge-slate {
+  background-color: var(--app-slate-soft);
+  color: var(--app-slate);
+}
+.app-badge-blue {
+  background-color: var(--app-blue-soft);
+  color: var(--app-blue);
+}
+.app-badge-amber {
+  background-color: var(--app-accent-soft);
+  color: var(--app-accent-strong);
+}
+
+.app-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 5px;
+  border: 1px solid var(--app-border-strong);
+  background-color: var(--app-surface);
+  color: var(--app-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Historique
+   ══════════════════════════════════════════════════════════════════ */
+
+.app-history-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.app-history-item:hover {
+  background-color: var(--app-surface-2);
+  border-color: var(--app-border);
+}
+
+.app-history-source {
+  font-size: 13px;
+  color: var(--app-text);
+  word-break: break-all;
+}
+
+.app-history-result {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--app-accent-strong);
+  word-break: break-all;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Tableau de valeurs
+   ══════════════════════════════════════════════════════════════════ */
+
+.app-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.app-table th {
+  text-align: left;
+  padding: 7px 12px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+  border-bottom: 1px solid var(--app-border);
+  white-space: nowrap;
+}
+
+.app-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--app-border);
+  color: var(--app-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.app-table tbody tr:hover {
+  background-color: var(--app-surface-2);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Graphe
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Le graphe est la ZONE PRINCIPALE de l'espace : il occupe donc la
+   colonne du milieu sur toute sa hauteur, et se taille plus grand que
+   les panneaux qui l'entourent. Une hauteur partagée avec eux en ferait
+   une vignette au milieu de deux listes.
+
+   HAUTEUR RELATIVE À LA FENÊTRE, ET NON FIXE.
+
+   La hauteur valait 360 px, puis 520 px au-delà de 768 px de large. Ce
+   second chiffre supposait que « large » veut dire « haut » — vrai sur un
+   ordinateur, faux sur un téléphone en paysage, qui est large (≈ 740 px)
+   ET bas (≈ 380 px). Le graphe y faisait alors 137 % de la fenêtre : à
+   lui seul, il occupait plus d'un écran, et comme il capte le toucher
+   (`touch-action: none`), on ne pouvait plus le dépasser en glissant
+   dessus. C'était le piège de défilement le plus coûteux de l'espace.
+
+   La condition de largeur est donc CONSERVÉE telle quelle — 768 px, celle
+   que C3 et C4 ont validée — et une condition de HAUTEUR s'y ajoute :
+   620 px. En dessous, le graphe ne peut plus prétendre à une grande
+   surface, quelle que soit la largeur ; au-dessus, la fenêtre a de quoi
+   le porter. Un téléphone couché est large mais bas : il ne remplit plus
+   la condition, et retombe sur la hauteur bornée.
+
+   Les bornes du cas court — jamais moins de 220 px, jamais plus de
+   380 px — laissent toujours de la place pour faire défiler la page
+   autour du graphe, ce qui est la seule façon d'en sortir au doigt.
+
+   `vh` d'abord, `dvh` ensuite : ce sont deux déclarations de la même
+   propriété, et la seconde n'est retenue que par les navigateurs qui la
+   connaissent. `dvh` suit la barre d'outils rétractable des navigateurs
+   mobiles, que `vh` ignore — sur un téléphone, 100 vh vaut la fenêtre
+   SANS la barre, donc plus que ce qu'on voit. Le repli est progressif et
+   sans risque : un navigateur qui ignore `dvh` garde la ligne `vh`.
+
+   Aucun JavaScript n'intervient ici, donc aucune boucle de rétroaction
+   possible entre la taille du graphe et celle de son conteneur. Le
+   redimensionnement de JSXGraph, lui, est déjà branché : la bibliothèque
+   pose son propre observateur sur le conteneur, et `resizeContainer` y
+   est appelé avec `dontset`, c'est-à-dire sans jamais écrire de taille en
+   ligne — la feuille de style reste seule maîtresse de la hauteur. */
+.app-graph {
+  width: 100%;
+  height: clamp(220px, 46vh, 380px);
+  height: clamp(220px, 46dvh, 380px);
+  border-radius: 10px;
+  border: 1px solid var(--app-border);
+  background-color: var(--app-surface);
+  overflow: hidden;
+  touch-action: none; /* le pincement zoome le graphe, pas la page */
+}
+
+/* Écran de travail : assez large ET assez haut. Le graphe reprend de
+   l'ampleur et suit la fenêtre — 60 % de sa hauteur, entre 420 px (sous
+   lequel la disposition à trois colonnes n'a plus d'intérêt) et 680 px
+   (au-delà, les deux colonnes latérales sont deux fois plus courtes que
+   lui, et l'ensemble se déséquilibre). */
+@media (min-width: 768px) and (min-height: 620px) {
+  .app-graph {
+    height: clamp(420px, 60vh, 680px);
+    height: clamp(420px, 60dvh, 680px);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Accessibilité : préférence système « animations réduites »
+   ══════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .app-key:active {
+    transform: none;
+  }
+  .app-shell * {
+    transition-duration: 0.01ms !important;
+  }
+}

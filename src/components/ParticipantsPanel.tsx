@@ -29,6 +29,15 @@ interface ParticipantsPanelProps {
   isHost: boolean;
   lobbyRequests: LobbyRequestItem[];
   onLobbyRespond: () => void;
+  /**
+   * Hauteur du chrome de réunion, mesurée par `RoomHeader`.
+   *
+   * Sur mobile le panneau est en `fixed` : sans cette valeur il démarrerait à
+   * y=0 et sa barre de titre se superposerait au header. En desktop, le
+   * panneau est dans le flux et c'est le parent qui réserve la hauteur — la
+   * valeur n'est alors pas utilisée.
+   */
+  headerHeight: number;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -40,6 +49,7 @@ export function ParticipantsPanel({
   isHost,
   lobbyRequests,
   onLobbyRespond,
+  headerHeight,
 }: ParticipantsPanelProps) {
   const participants = useParticipants();
   const { localParticipant } = useLocalParticipant();
@@ -96,8 +106,15 @@ export function ParticipantsPanel({
     }
   }
 
+  // Mobile : plein écran SOUS le header. Le `top` est la hauteur MESURÉE du
+  // chrome de réunion — jamais une constante recopiée. En desktop, le panneau
+  // repasse dans le flux (`sm:static`) et le parent réserve déjà la hauteur du
+  // header : `top` est alors ignoré par le navigateur.
   return (
-    <aside className="fixed inset-x-0 top-0 bottom-16 z-40 flex h-auto w-full flex-col bg-[#0f0f0f] sm:static sm:bottom-auto sm:z-auto sm:h-full sm:w-80">
+    <aside
+      style={{ top: headerHeight }}
+      className="fixed inset-x-0 bottom-16 z-40 flex h-auto w-full flex-col bg-[#0f0f0f] sm:static sm:bottom-auto sm:z-auto sm:h-full sm:w-80"
+    >
       {/* Header */}
       <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-white/5 px-4">
         <div className="flex items-center gap-2.5">

@@ -15,6 +15,7 @@ import {
   Settings,
   User,
   Inbox,
+  LayoutDashboard,
 } from "lucide-react";
 import { createMeeting, listMyMeetings, type MeetingListItem } from "../lib/meetingApi";
 import {
@@ -170,6 +171,17 @@ export function Home() {
                 <span className="hidden font-medium sm:inline">{user.name}</span>
               </Link>
             )}
+            {/* Accès à l'espace d'administration. Ajout purement additif :
+                aucune action existante n'est déplacée ni modifiée. */}
+            <Link
+              to="/dashboard"
+              aria-label="Espace d'administration"
+              title="Espace d'administration"
+              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 transition-all hover:bg-white/10 hover:text-white"
+            >
+              <LayoutDashboard size={14} />
+              <span className="hidden lg:inline">Administration</span>
+            </Link>
             {/* Déconnexion desktop uniquement */}
             <button
               type="button"

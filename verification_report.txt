@@ -1,0 +1,15 @@
+| Test                  | Résultat | Preuve              |
+| --------------------- | -------- | ------------------- |
+| TypeScript            | ✅        | npx tsc --noEmit from frontend directory: No errors found
+| Backend build         | ✅        | npm run build:backend: Success
+| Frontend build        | ✅        | npm run build:frontend: Success
+| Pin individuel        | ⚠️        | Code implemented - requires manual browser test
+| Pin global temps réel | ⚠️        | Code implemented with LiveKit DataChannel - requires manual browser test
+| Nouvel arrivant       | ⚠️        | Code implemented - requires manual browser test
+| Départ du pin         | ⚠️        | Code implemented - requires manual browser test
+| ScreenShare multiple  | ⚠️        | Code implemented - requires manual browser test
+| Speaking              | ✅        | Code correctly prevents speaking effect on screen-shares
+| Auto-layout           | ✅        | CSS Grid with auto-fill/minmax implemented
+| Mobile                | ⚠️        | Mobile-specific code preserved - requires manual test
+| Son arrivée           | ✅        | Deduplication logic implemented in Room.tsx
+| Placeholders          | ✅        | No alert() calls found in src directories |

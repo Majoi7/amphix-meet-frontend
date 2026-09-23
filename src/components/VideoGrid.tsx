@@ -1,51 +1,39 @@
-import { useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Track } from "livekit-client";
-import {
-  useTracks,
-  useLocalParticipant,
-  useIsSpeaking,
-} from "@livekit/components-react";
+import { useTracks, useLocalParticipant } from "@livekit/components-react";
+import type { TrackReferenceOrPlaceholder } from "@livekit/components-react";
 import { ParticipantTile } from "./ParticipantTile";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { useElementSize } from "../hooks/useElementSize";
+import { useGlobalPin } from "../hooks/useGlobalPin";
+import { authorizedRequest } from "../lib/httpClient";
+import { computeLayout, rectToStyle } from "../lib/layoutEngine";
+import type {
+  LayoutPin,
+  LayoutRect,
+  LayoutSlot,
+  LayoutTile,
+} from "../lib/layoutEngine";
 
-// Wrapper component to properly handle useIsSpeaking hook
-function ParticipantTileWithSpeaking({
-  trackRef,
-  isLocal,
-  className,
-  onTogglePin,
-  isPinned,
-  isScreenShare
-}: {
-  trackRef: ReturnType<typeof useTracks>[number];
-  isLocal: boolean;
-  className?: string;
-  onTogglePin?: () => void;
-  isPinned?: boolean;
-  isScreenShare?: boolean;
-}) {
-  const isSpeaking = useIsSpeaking(trackRef.participant);
-
-  // Build className with speaking effect if applicable
-  const speakingClassName = isSpeaking ? "ring-2 ring-blue-500/75 animate-pulse" : "";
-  const finalClassName = `${className || ""} ${speakingClassName}`.trim();
-
-  return (
-    <ParticipantTile
-      trackRef={trackRef}
-      isLocal={isLocal}
-      className={finalClassName}
-      onTogglePin={onTogglePin}
-      isPinned={isPinned}
-      isScreenShare={isScreenShare}
-    />
-  );
+function sourceOf(track: TrackReferenceOrPlaceholder): "camera" | "screenshare" {
+  return track.source === Track.Source.ScreenShare ? "screenshare" : "camera";
 }
 
-export function VideoGrid() {
+/**
+ * Affiche la réunion.
+ *
+ * Ce composant ne décide plus de la disposition : il collecte l'état
+ * (tuiles, épingles, espace mesuré), le confie au moteur de layout, et
+ * applique le résultat. Toute la logique de priorité et de géométrie vit
+ * dans `lib/layoutEngine.ts`.
+ *
+ * Priorité appliquée par le moteur :
+ *   GLOBAL PIN > LOCAL PIN > SCREEN SHARE > ACTIVE SPEAKER > AUTO LAYOUT
+ */
+export function VideoGrid({ roomId, isHost }: { roomId?: string; isHost?: boolean }) {
   const isMobile = useIsMobile();
-  const { localParticipant } = useLocalParticipant();
-  const [pinnedIdentity, setPinnedIdentity] = useState<string | null>(null);
+  const { ref: stageRef, size } = useElementSize<HTMLDivElement>();
+  const { isScreenShareEnabled } = useLocalParticipant();
 
   const tracks = useTracks(
     [
@@ -55,393 +43,239 @@ export function VideoGrid() {
     { onlySubscribed: false }
   );
 
-  const screenShareTrack = tracks.find((t) => t.source === Track.Source.ScreenShare);
+  const isHostFlag = isHost ?? false;
+  // L'épingle locale est mémorisée par IDENTITÉ, pas par référence d'objet :
+  // LiveKit recrée les `TrackReference` au moindre changement (orateur actif,
+  // publication de piste). Comparer les références ferait perdre l'épingle
+  // sans aucun signe visible.
+  const [localPin, setLocalPin] = useState<LayoutPin | null>(null);
+  const globalPinState = useGlobalPin(roomId ?? "");
 
-  // Ordre STABLE — on ne trie plus par "qui parle en ce moment" : ça
-  // faisait sauter les tuiles de position à chaque prise de parole.
-  // Pour mettre quelqu'un en avant, on utilise désormais l'épingle
-  // (bouton sur la tuile) plutôt qu'un tri automatique.
-  const cameraTracks = tracks.filter((t) => t.source === Track.Source.Camera);
+  // Une seule tuile par couple (participant, source) — on garde caméra ET
+  // partage d'écran d'un même participant.
+  const deduplicatedTracks = useMemo(() => {
+    const map = new Map<string, TrackReferenceOrPlaceholder>();
+    tracks.forEach((track) => {
+      if (!track) return;
+      const key = `${track.participant.identity}-${track.source}`;
+      if (!map.has(key)) map.set(key, track);
+    });
+    return Array.from(map.values());
+  }, [tracks]);
 
-  function togglePin(identity: string) {
-    setPinnedIdentity((current) => (current === identity ? null : identity));
-  }
+  // Ordre d'arrivée stable : sert à départager sans jamais réordonner la
+  // grille à chaque rendu (sinon les tuiles « sautent »).
+  const arrivalOrderRef = useRef<Map<string, number>>(new Map());
+  const arrivalCounterRef = useRef(0);
 
-  // Si la personne épinglée quitte la réunion ou coupe sa caméra, on se
-  // rabat proprement sur la grille plutôt que d'afficher un spotlight vide.
-  const pinnedTrack = pinnedIdentity
-    ? cameraTracks.find((t) => t.participant.identity === pinnedIdentity)
-    : undefined;
+  const layoutTiles: LayoutTile[] = useMemo(() => {
+    const order = arrivalOrderRef.current;
+    return deduplicatedTracks.map((track) => {
+      const id = `${track.participant.identity}-${track.source}`;
+      if (!order.has(id)) {
+        order.set(id, arrivalCounterRef.current);
+        arrivalCounterRef.current += 1;
+      }
+      return {
+        id,
+        identity: track.participant.identity,
+        source: sourceOf(track),
+        isLocal: track.participant.isLocal,
+        isSpeaking: track.participant.isSpeaking,
+        hasVideo: !!(track.publication && !track.publication.isMuted),
+        name: track.participant.name || track.participant.identity,
+        arrivalIndex: order.get(id) ?? 0,
+      };
+    });
+  }, [deduplicatedTracks]);
 
-  // ═════ Screen share garde son propre layout — prioritaire sur l'épingle ═════
-  if (screenShareTrack) {
-    return (
-      <div className="relative flex h-full w-full items-center justify-center gap-3 overflow-hidden p-4 sm:gap-4 sm:p-6">
-        {/* Main content: screen share left, camera tracks right */}
-        <div className="relative flex h-full flex-1 items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl">
-          <ParticipantTileWithSpeaking
-            trackRef={screenShareTrack}
-            isLocal={screenShareTrack.participant.isLocal}
-            isScreenShare
-            className="h-full w-full"
-          />
-        </div>
+  const pins = useMemo(() => {
+    const global: LayoutPin | null =
+      globalPinState.participantId && globalPinState.trackSource
+        ? {
+            identity: globalPinState.participantId,
+            source: globalPinState.trackSource === "Camera" ? "camera" : "screenshare",
+          }
+        : null;
+    return { global, local: localPin };
+  }, [globalPinState.participantId, globalPinState.trackSource, localPin]);
 
-        {cameraTracks.length > 0 && (
-          <div className="flex h-full w-28 flex-shrink-0 flex-col gap-2 overflow-y-auto sm:w-32">
-            {cameraTracks.map((trackRef) => (
-              <div
-                key={trackRef.participant.identity}
-                className="aspect-video w-full flex-shrink-0 overflow-hidden rounded-xl"
-              >
-                <ParticipantTileWithSpeaking
-                  trackRef={trackRef}
-                  isLocal={trackRef.participant.isLocal}
-                  className="h-full w-full"
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ═════ Spotlight — quelqu'un est épinglé ═════
-  if (pinnedTrack) {
-    const others = cameraTracks.filter((t) => t.participant.identity !== pinnedIdentity);
-    return isMobile ? (
-      <PinnedMobileLayout pinnedTrack={pinnedTrack} others={others} onTogglePin={togglePin} />
-    ) : (
-      <PinnedDesktopLayout pinnedTrack={pinnedTrack} others={others} onTogglePin={togglePin} />
-    );
-  }
-
-  const count = cameraTracks.length;
-  const localIdentity = localParticipant?.identity;
-
-  /* ═════════════════════════════════════════════════════════════════
-     MOBILE — Comportement Google Meet
-     ═══════════════════════════════════════════════════════════════════ */
-  if (isMobile) {
-    if (count === 1) {
-      return (
-        <div className="flex h-full w-full items-center justify-center p-3">
-          <div className="relative h-full w-full overflow-hidden rounded-2xl bg-meet-tile">
-            <ParticipantTileWithSpeaking
-              trackRef={cameraTracks[0]}
-              isLocal={cameraTracks[0].participant.isLocal}
-              className="h-full w-full"
-            />
-          </div>
-        </div>
-      );
-    }
-
-    if (count === 2) {
-      const other =
-        cameraTracks.find((t) => t.participant.identity !== localIdentity) || cameraTracks[0];
-      const me = cameraTracks.find((t) => t.participant.identity === localIdentity);
-
-      return (
-        <div className="relative h-full w-full bg-black">
-          <div className="h-full w-full">
-            <ParticipantTileWithSpeaking
-              trackRef={other}
-              isLocal={other.participant.isLocal}
-              onTogglePin={() => togglePin(other.participant.identity)}
-              className="h-full w-full"
-            />
-          </div>
-
-          {me && (
-            <div className="absolute bottom-20 right-3 z-10 h-32 w-24 overflow-hidden rounded-2xl border border-white/10 shadow-2xl sm:h-36 sm:w-28">
-              <ParticipantTileWithSpeaking trackRef={me} isLocal className="h-full w-full" />
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (count <= 4) {
-      return (
-        <div className="flex h-full w-full flex-col gap-1.5 p-1.5">
-          {cameraTracks.map((trackRef) => (
-            <div
-              key={trackRef.participant.identity}
-              className="relative flex-1 overflow-hidden rounded-2xl bg-black"
-            >
-              <ParticipantTileWithSpeaking
-                trackRef={trackRef}
-                isLocal={trackRef.participant.isLocal}
-                onTogglePin={() => togglePin(trackRef.participant.identity)}
-                className="h-full w-full"
-              />
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    const [first, ...rest] = cameraTracks;
-
-    return (
-      <div className="flex h-full w-full flex-col gap-1.5 p-1.5">
-        <div className="relative h-[55%] overflow-hidden rounded-2xl bg-black">
-          <ParticipantTileWithSpeaking
-            trackRef={first}
-            isLocal={first.participant.isLocal}
-            onTogglePin={() => togglePin(first.participant.identity)}
-            className="h-full w-full"
-          />
-        </div>
-
-        <div className="flex h-[45%] gap-2 overflow-x-auto overflow-y-hidden pb-1 snap-x snap-mandatory">
-          {rest.map((trackRef) => (
-            <div
-              key={trackRef.participant.identity}
-              className="h-full flex-shrink-0 snap-start overflow-hidden rounded-xl bg-black"
-              style={{ aspectRatio: "3/4" }}
-            >
-              <ParticipantTileWithSpeaking
-                trackRef={trackRef}
-                isLocal={trackRef.participant.isLocal}
-                onTogglePin={() => togglePin(trackRef.participant.identity)}
-                className="h-full w-full"
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  /* ═════════════════════════════════════════════════════════════════
-     DESKTOP
-     Disposition en lignes fixes : jusqu'à 6 tuiles par ligne, 3 lignes max (18 tuiles).
-     Au-delà de 18, afficher un indicateur +N après les 18 premières tuiles.
-     Les lignes sont remplies par paires lorsque le nombre est pair pour éviter
-     un déséquilibre visuel.
-     ══════════════════════════════════════════════════════════════════ */
-  if (count === 1) {
-    return (
-      <div className="flex h-full w-full items-center justify-center p-6 sm:p-10">
-        <div className="relative w-full max-w-3xl overflow-hidden rounded-[2rem] bg-meet-tile shadow-2xl aspect-video">
-          <ParticipantTileWithSpeaking
-            trackRef={cameraTracks[0]}
-            isLocal={cameraTracks[0].participant.isLocal}
-            className="h-full w-full"
-          />
-        </div>
-      </div>
-    );
-  }
-
-  const { rows, tileSize, overflowCount } = getDesktopRows(count);
-  let trackIndex = 0;
-
-  return (
-    <div className="flex h-full w-full items-center justify-center overflow-hidden p-4 sm:p-6">
-      <div className="flex flex-col gap-1 sm:gap-1.5">
-        {rows.map((rowLength, rowIdx) => (
-          <div key={rowIdx} className="flex gap-1 sm:gap-1.5">
-            {Array.from({ length: rowLength }).map((_, cellIdx) => {
-              const isLastCell =
-                rowIdx === rows.length - 1 && cellIdx === rowLength - 1;
-
-              if (isLastCell && overflowCount > 0) {
-                // Overflow indicator cell
-                return (
-                  <div
-                    key="overflow"
-                    className="flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-meet-tile"
-                    style={{ width: tileSize, height: tileSize }}
-                  >
-                    <span className="text-3xl font-semibold text-white sm:text-4xl">
-                      +{overflowCount}
-                    </span>
-                  </div>
-                );
-              }
-
-              const trackRef = cameraTracks[trackIndex];
-              trackIndex += 1;
-              return (
-                <div
-                  key={trackRef.participant.identity}
-                  className="aspect-square overflow-hidden rounded-2xl"
-                  style={{ width: tileSize, height: tileSize }}
-                >
-                  <ParticipantTileWithSpeaking
-                    trackRef={trackRef}
-                    isLocal={trackRef.participant.isLocal}
-                    className={`
-                      h-full w-full
-                    `}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
+  // Le cœur : une fonction pure, recalculée seulement quand une entrée change.
+  const layout = useMemo(
+    () =>
+      computeLayout({
+        tiles: layoutTiles,
+        viewport: size,
+        pins,
+        // Quand JE partage, ma caméra disparaît du rendu — elle reste
+        // publiée dans LiveKit, on ne cache que l'affichage.
+        localScreenShareActive: isScreenShareEnabled,
+        gap: isMobile ? 6 : 10,
+      }),
+    [layoutTiles, size, pins, isScreenShareEnabled, isMobile]
   );
-}
 
-/**
- * Détermine la disposition en lignes fixes + la taille des tuiles selon
- * le nombre de participants.
- * - Max 6 tuiles par ligne
- * - Max 3 lignes visibles (18 tuiles)
- * - Au-delà de 18, overflowCount indique le nombre de tuiles masquées
- * - Lorsqu'il est possible, les lignes sont remplies par paires (2,4,6) pour
- *   garder un équilibre visuel.
- */
-function getDesktopRows(count: number): {
-  rows: number[];
-  tileSize: number;
-  overflowCount: number;
-} {
-  const MAX_PER_ROW = 6;
-  const MAX_ROWS = 3;
-  const VISIBLE_LIMIT = MAX_PER_ROW * MAX_ROWS; // 18
+  /**
+   * Fenêtre visible du bandeau secondaire, exprimée dans le repère de la
+   * scène. Sert de conteneur de défilement : sans elle, les tuiles qui
+   * dépassent la capacité visible étaient coupées par l'`overflow-hidden` de
+   * la scène, donc invisibles ET inatteignables.
+   *
+   * Elle est désormais FOURNIE PAR LE MOTEUR (`stripRect`) au lieu d'être
+   * déduite des bornes de la zone principale. La déduction supposait que le
+   * bandeau ne dépasse jamais la tuile principale — vrai en mode « scène »,
+   * faux en mode « focus », où le bandeau occupe toute la hauteur. Les tuiles
+   * de la seconde rangée auraient alors été rognées.
+   */
+  const stripWindow = layout.stripRect;
 
-  let overflowCount = 0;
-  let visibleCount = Math.min(count, VISIBLE_LIMIT);
-  if (count > VISIBLE_LIMIT) {
-    overflowCount = count - VISIBLE_LIMIT;
-  }
+  const trackById = useMemo(() => {
+    const map = new Map<string, TrackReferenceOrPlaceholder>();
+    deduplicatedTracks.forEach((track) => {
+      map.set(`${track.participant.identity}-${track.source}`, track);
+    });
+    return map;
+  }, [deduplicatedTracks]);
 
-  // We want to fill rows with even numbers when possible.
-  // Start by filling as many full rows of 6 as needed, then adjust.
-  const fullRows = Math.floor(visibleCount / MAX_PER_ROW);
-  const remainder = visibleCount % MAX_PER_ROW;
-  let rows: number[] = Array(fullRows).fill(MAX_PER_ROW);
+  const globalPinnedTrackObj = useMemo(() => {
+    if (!pins.global) return null;
+    return (
+      deduplicatedTracks.find(
+        (t) => t.participant.identity === pins.global!.identity && sourceOf(t) === pins.global!.source
+      ) ?? null
+    );
+  }, [deduplicatedTracks, pins.global]);
 
-  if (remainder > 0) {
-    // Try to make the last row even if possible by borrowing from previous row.
-    if (rows.length > 0 && remainder % 2 !== 0) {
-      // If remainder is odd, we take 1 from the last full row to make it even.
-      rows[rows.length - 1] -= 1;
-      rows.push(remainder + 1);
-    } else {
-      rows.push(remainder);
-    }
-  }
+  /* --- Actions ---------------------------------------------------- */
 
-  // If we have no rows (count < 6) we still want at least one row.
-  if (rows.length === 0 && visibleCount > 0) {
-    rows = [visibleCount];
-  }
+  const togglePin = useCallback((trackRef: TrackReferenceOrPlaceholder) => {
+    const candidate: LayoutPin = {
+      identity: trackRef.participant.identity,
+      source: sourceOf(trackRef),
+    };
+    setLocalPin((prev) =>
+      prev && prev.identity === candidate.identity && prev.source === candidate.source
+        ? null
+        : candidate
+    );
+  }, []);
 
-  // Tile size mapping: larger counts get smaller tiles.
-  // We keep a reasonable size down to 18, then fallback to 80px.
-  const sizeByCount: Record<number, number> = {
-    2: 280,
-    3: 260,
-    4: 240,
-    5: 220,
-    6: 200,
-    7: 190,
-    8: 180,
-    9: 170,
-    10: 160,
-    11: 150,
-    12: 140,
-    13: 130,
-    14: 120,
-    15: 115,
-    16: 110,
-    17: 105,
-    18: 100,
+  const requestGlobalPin = useCallback(
+    async (trackRef: TrackReferenceOrPlaceholder | null) => {
+      if (!roomId) return;
+      try {
+        if (trackRef) {
+          await authorizedRequest(`/api/v1/meetings/${roomId}/global-pin`, {
+            method: "POST",
+            body: JSON.stringify({
+              participantId: trackRef.participant.identity,
+              trackSource: trackRef.source === Track.Source.Camera ? "Camera" : "ScreenShare",
+            }),
+          });
+        } else {
+          await authorizedRequest(`/api/v1/meetings/${roomId}/global-pin`, {
+            method: "DELETE",
+          });
+        }
+      } catch (err) {
+        console.error("Failed to update global pin", err);
+      }
+    },
+    [roomId]
+  );
+
+  /* --- Rendu ------------------------------------------------------ */
+
+  // Épingler n'a de sens qu'à partir de deux tuiles.
+  const canPin = layoutTiles.length > 1;
+
+  const renderSlot = (
+    slot: LayoutSlot,
+    variant: "main" | "secondary" | "self",
+    /** Repère de placement. Absent = repère de la scène. */
+    origin?: LayoutRect
+  ) => {
+    const trackRef = trackById.get(slot.tile.id);
+    if (!trackRef) return null;
+
+    const isScreenShare = slot.tile.source === "screenshare";
+    const isPinnedLocally =
+      !!pins.local &&
+      pins.local.identity === slot.tile.identity &&
+      pins.local.source === slot.tile.source;
+
+    // Dans un conteneur de défilement, les tuiles se placent relativement à
+    // la fenêtre du bandeau, pas à la scène.
+    const rect: LayoutRect = origin
+      ? {
+          x: slot.rect.x - origin.x,
+          y: slot.rect.y - origin.y,
+          w: slot.rect.w,
+          h: slot.rect.h,
+        }
+      : slot.rect;
+
+    return (
+      <div
+        // Clé stable par tuile : quand une tuile passe de secondaire à
+        // principale (épinglage, orateur actif), React DÉPLACE l'élément au
+        // lieu de le remonter — la vidéo ne se coupe pas et la transition
+        // de géométrie s'anime.
+        key={slot.tile.id}
+        style={rectToStyle(rect)}
+        className={
+          variant === "self"
+            ? "animate-self-view-in absolute z-20"
+            : "absolute transition-[left,top,width,height] duration-200 ease-out"
+        }
+      >
+        <ParticipantTile
+          trackRef={trackRef}
+          isLocal={slot.tile.isLocal}
+          isScreenShare={isScreenShare}
+          isPinned={isPinnedLocally}
+          globalPinnedTrack={globalPinnedTrackObj}
+          onTogglePin={togglePin}
+          onRequestGlobalPin={requestGlobalPin}
+          isHost={isHostFlag}
+          fill
+          // La vignette caméra locale est épinglable comme n'importe quelle
+          // autre : c'est la seule façon, en mode scène, de se remettre en
+          // zone principale. Elle l'excluait auparavant (`variant === "self"`).
+          showPinButton={canPin}
+          radius={variant === "main" ? "2xl" : "xl"}
+          className="h-full w-full"
+        />
+      </div>
+    );
   };
-  const tileSize = sizeByCount[visibleCount] ?? 80;
 
-  return { rows, tileSize, overflowCount };
-}
+  // Le défilement ne concerne QUE le bandeau secondaire. La scène conserve
+  // son `overflow-hidden` : elle ne devient jamais scrollable.
+  const stripScrollClass = layout.stripScrolls
+    ? layout.strip === "row"
+      ? "strip-scroll overflow-x-auto overflow-y-hidden"
+      : "strip-scroll overflow-y-auto overflow-x-hidden"
+    : "overflow-hidden";
 
-/* ════════════════════════════════════════════════════════════════
-   Layouts Screen Share
-   ═══════════════════════════════════════════════════════════════ */
-
-
-/* ════════════════════════════════════════════════════════════════
-   Layouts Épingle (spotlight) — même structure que le partage d'écran,
-   mais avec le participant épinglé en grand et un bouton pour
-   désépingler directement sur sa tuile.
-   ════════════════════════════════════════════════════════════════ */
-
-interface PinnedLayoutProps {
-  pinnedTrack: ReturnType<typeof useTracks>[number];
-  others: ReturnType<typeof useTracks>;
-  onTogglePin: (identity: string) => void;
-}
-
-function PinnedDesktopLayout({ pinnedTrack, others, onTogglePin }: PinnedLayoutProps) {
   return (
-    <div className="flex h-full w-full items-center justify-center gap-3 overflow-hidden p-4 sm:gap-4 sm:p-6">
-      <div className="relative flex h-full flex-1 items-center justify-center overflow-hidden rounded-2xl bg-black shadow-xl">
-        <ParticipantTileWithSpeaking
-          trackRef={pinnedTrack}
-          isLocal={pinnedTrack.participant.isLocal}
-          isPinned
-          onTogglePin={() => onTogglePin(pinnedTrack.participant.identity)}
-          className="h-full w-full"
-        />
-      </div>
+    <div ref={stageRef} className="relative h-full w-full overflow-hidden">
+      {layout.main && renderSlot(layout.main, "main")}
 
-      {others.length > 0 && (
-        <div className="flex h-full w-28 flex-shrink-0 flex-col gap-2 overflow-y-auto sm:w-32">
-          {others.map((trackRef) => (
-            <div
-              key={trackRef.participant.identity}
-              className="aspect-video w-full flex-shrink-0 overflow-hidden rounded-xl"
-            >
-              <ParticipantTileWithSpeaking
-                trackRef={trackRef}
-                isLocal={trackRef.participant.isLocal}
-                onTogglePin={() => onTogglePin(trackRef.participant.identity)}
-                className="h-full w-full"
-              />
-            </div>
-          ))}
+      {/* Bandeau secondaire. Ses bornes viennent du moteur ; il défile dans
+          son propre axe dès que `stripScrolls` signale un débordement. */}
+      {stripWindow ? (
+        <div
+          style={rectToStyle(stripWindow)}
+          className={`absolute transition-[left,top,width,height] duration-200 ease-out overscroll-contain ${stripScrollClass}`}
+        >
+          {layout.secondary.map((slot) => renderSlot(slot, "secondary", stripWindow))}
         </div>
+      ) : (
+        layout.secondary.map((slot) => renderSlot(slot, "secondary"))
       )}
-    </div>
-  );
-}
 
-function PinnedMobileLayout({ pinnedTrack, others, onTogglePin }: PinnedLayoutProps) {
-  return (
-    <div className="flex h-full w-full flex-col gap-2 overflow-hidden p-2">
-      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl bg-black">
-        <ParticipantTileWithSpeaking
-          trackRef={pinnedTrack}
-          isLocal={pinnedTrack.participant.isLocal}
-          isPinned
-          onTogglePin={() => onTogglePin(pinnedTrack.participant.identity)}
-          className="h-full w-full"
-        />
-      </div>
-
-      {others.length > 0 && (
-        <div className="flex h-16 flex-shrink-0 gap-2 overflow-x-auto">
-          {others.map((trackRef) => (
-            <div
-              key={trackRef.participant.identity}
-              className="aspect-video h-full flex-shrink-0 overflow-hidden rounded-lg"
-            >
-              <ParticipantTileWithSpeaking
-                trackRef={trackRef}
-                isLocal={trackRef.participant.isLocal}
-                onTogglePin={() => onTogglePin(trackRef.participant.identity)}
-                className="h-full w-full"
-              />
-            </div>
-          ))}
-        </div>
-      )}
+      {layout.selfView && renderSlot(layout.selfView, "self")}
     </div>
   );
 }

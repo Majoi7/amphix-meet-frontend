@@ -29,6 +29,13 @@ export interface WhiteboardStroke {
 export interface WhiteboardData {
   version?: 2;
   strokes: WhiteboardStroke[];
+  /**
+   * Identifiant du fond de la feuille (voir `lib/whiteboardBackgrounds.ts`).
+   * Optionnel : les documents enregistrés avant cette fonctionnalité n'ont pas
+   * le champ, et retombent sur le fond par défaut. Il voyage dans la colonne
+   * `Json` existante — aucune migration, aucune table, aucun changement backend.
+   */
+  background?: string;
 }
 
 export interface WhiteboardCamera {

@@ -9,28 +9,42 @@ import {
   RoomAudioRenderer,
 } from "@livekit/components-react";
 import "@livekit/components-styles";
-import { Hand } from "lucide-react";
 import { joinMeeting, getLobbyStatus, endMeeting as endMeetingApi } from "../lib/meetingApi";
 import { PreJoin } from "./PreJoin";
-import { WaitingForApproval } from "../components/WaitingForApproval";
+import { RoomHeader } from "../components/RoomHeader";
 import { VideoGrid } from "../components/VideoGrid";
-import { Whiteboard } from "../components/Whiteboard";
 import { MeetControls } from "../components/MeetControls";
 import { ParticipantsPanel } from "../components/ParticipantsPanel";
 import { ChatPanel } from "../components/ChatPanel";
-import { ChatNotification } from "../components/ChatNotification";
 import { ToastProvider } from "../components/ToastProvider";
+import { WaitingForApproval } from "../components/WaitingForApproval";
+import { ConnectionBanner } from "../components/ConnectionBanner";
+import { Whiteboard } from "../components/Whiteboard";
+import { ChatNotification } from "../components/ChatNotification";
+import { HandRaiseNotification } from "../components/HandRaiseNotification";
+import { ReactionOverlay } from "../components/ReactionOverlay";
+import { Hand } from "lucide-react";
 import { useParticipantNotifications } from "../hooks/useParticipantNotifications";
 import { useLobbyRequests } from "../hooks/useLobbyRequests";
-import { useHandRaise, type HandPayload } from "../hooks/useHandRaise";
-import type { DevicePreferences } from "../types";
-import { ConnectionBanner } from "../components/ConnectionBanner";
+import { useHandRaise } from "../hooks/useHandRaise";
 import { useReactions } from "../hooks/useReactions";
-import { ReactionOverlay } from "../components/ReactionOverlay";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { HandRaiseNotification } from "../components/HandRaiseNotification";
-type PanelState = "none" | "chat" | "participants";
+import { playSound, SOUND_HAND_RAISE, SOUND_SORTIE } from "../lib/sounds";
+import type { DevicePreferences } from "../types";
+
 const LOBBY_POLL_INTERVAL_MS = 3000;
+
+/**
+ * Hauteur du header avant sa première mesure.
+ *
+ * Elle correspond à la classe `h-14` du header (3,5 rem = 56 px) : la valeur
+ * affichée avant l'arrivée du `ResizeObserver` est donc déjà la bonne, et
+ * aucun saut de mise en page n'est visible. La mesure réelle prend le relais
+ * dès le premier rendu.
+ */
+const HEADER_FALLBACK_HEIGHT = 56;
+
+type PanelState = "none" | "chat" | "participants";
 
 interface ConnectionInfo {
   token: string;
@@ -59,13 +73,7 @@ export function RoomPage() {
       pendingPrefsRef.current = prefs;
       try {
         const result = await joinMeeting(roomId);
-        console.debug("[Room] joinMeeting result received, waiting:", result.waiting);
         if (!result.waiting) {
-          console.debug("[Room] Token received, length:", result.token?.length ?? 0);
-        }
-        if (result.waiting) {
-          setWaitingLobbyId(result.lobbyRequestId);
-        } else {
           setConnection({
             token: result.token,
             livekitUrl: result.livekitUrl,
@@ -74,9 +82,10 @@ export function RoomPage() {
             isHost: result.role === "HOST",
             endsAt: result.endsAt,
           });
+        } else {
+          setWaitingLobbyId(result.lobbyRequestId);
         }
       } catch (err) {
-        console.error("[Room] joinMeeting error:", err);
         setError(
           "Impossible de rejoindre la réunion. Vérifie ta connexion et réessaie."
         );
@@ -97,7 +106,6 @@ export function RoomPage() {
         if (cancelled) return;
 
         if (status.status === "APPROVED") {
-          console.debug("[Room] Lobby approved, token received, length:", status.token?.length ?? 0);
           clearInterval(interval);
           setWaitingLobbyId(null);
           const prefs = pendingPrefsRef.current;
@@ -125,29 +133,62 @@ export function RoomPage() {
     };
   }, [waitingLobbyId]);
 
-  function handleLeave() {
+  /**
+   * Son de sortie — LOCAL, et joué une seule fois.
+   *
+   * `sortie.mp3` appartient à celui qui part : les autres participants ne
+   * doivent RIEN entendre. Il ne peut donc pas être déclenché depuis la liste
+   * des participants (ce code s'exécuterait chez tout le monde) : il est joué
+   * ici, au moment où l'utilisateur local provoque lui-même son départ.
+   *
+   * Le verrou couvre le cas où LiveKit rappelle `onDisconnected` derrière un
+   * départ volontaire : le son ne repart pas une seconde fois.
+   */
+  const leaveSoundPlayedRef = useRef(false);
+  function playLeaveSoundOnce() {
+    if (leaveSoundPlayedRef.current) return;
+    leaveSoundPlayedRef.current = true;
+    playSound(SOUND_SORTIE);
+  }
+
+  /** Sortie de la salle — sans son : voir `playLeaveSoundOnce`. */
+  function exitRoom() {
     localStorage.removeItem(`amphix-chat-${roomId}`);
-    setConnection(null);
+
+    if (!hadErrorRef.current) {
+      setConnection(null);
+    }
+
     if (hadErrorRef.current) {
       hadErrorRef.current = false;
       return;
     }
+
     navigate("/");
   }
 
-  /** Hôte uniquement — coupe réellement la réunion pour tout le monde
-   * côté serveur (LiveKit + DB), même si les 3h ne sont pas atteintes.
-   * On quitte localement dans tous les cas, même si l'appel échoue :
-   * le disconnect LiveKit (onDisconnected → handleLeave) prendra le
-   * relais si la room a bien été fermée côté serveur. */
+  /** Départ VOLONTAIRE (bouton « Quitter ») : on entend le son de sortie. */
+  function handleLeave() {
+    playLeaveSoundOnce();
+    exitRoom();
+  }
+
+  /** Déconnexion SUBIE (erreur, salle fermée côté serveur) : aucun son. */
+  function handleDisconnected() {
+    exitRoom();
+  }
+
   async function handleEndMeeting() {
     if (!roomId) return;
+    // Joué AVANT l'appel réseau : le son part pendant que la salle se ferme,
+    // au lieu d'être coupé avec la page.
+    playLeaveSoundOnce();
     try {
       await endMeetingApi(roomId);
     } catch (err) {
       console.error("[RoomPage] Erreur lors de la fermeture de la réunion:", err);
     } finally {
-      handleLeave();
+      exitRoom();
     }
   }
 
@@ -163,7 +204,6 @@ export function RoomPage() {
       console.error("[LiveKitRoom] Erreur reason:", (err as any).reason);
     }
     hadErrorRef.current = true;
-    setConnection(null);
     setError(
       "La connexion à la réunion a été interrompue de façon inattendue. Réessaie de rejoindre."
     );
@@ -189,17 +229,21 @@ export function RoomPage() {
       audio={connection.micEnabled}
       video={connection.cameraEnabled}
       connect
-      onDisconnected={handleLeave}
+      onDisconnected={handleDisconnected}
       onError={handleRoomError}
       className="h-screen overflow-hidden"
       data-lk-theme="default"
     >
-      <MeetingLayout
-        roomId={roomId}
-        isHost={connection.isHost}
-        onLeave={handleLeave}
-        onEndMeeting={handleEndMeeting}
-      />
+      <ConnectionBanner />
+      <ToastProvider>
+        <MeetingLayout
+          roomId={roomId}
+          isHost={connection.isHost}
+          endsAt={connection.endsAt}
+          onLeave={handleLeave}
+          onEndMeeting={handleEndMeeting}
+        />
+      </ToastProvider>
       <RoomAudioRenderer />
       <StartAudio label="Cliquer pour activer le son" />
     </LiveKitRoom>
@@ -209,42 +253,48 @@ export function RoomPage() {
 interface MeetingLayoutProps {
   roomId: string;
   isHost: boolean;
+  endsAt: string | null;
   onLeave: () => void;
   onEndMeeting: () => void;
 }
 
-function MeetingLayout({ roomId, isHost, onLeave, onEndMeeting }: MeetingLayoutProps) {
-  return (
-    <ToastProvider>
-      <MeetingLayoutInner
-        roomId={roomId}
-        isHost={isHost}
-        onLeave={onLeave}
-        onEndMeeting={onEndMeeting}
-      />
-    </ToastProvider>
-  );
-}
-
-function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLayoutProps) {
+function MeetingLayout({ roomId, isHost, endsAt, onLeave, onEndMeeting }: MeetingLayoutProps) {
   const [panel, setPanel] = useState<PanelState>("none");
+  // « Plus d'options » (menu desktop, feuille mobile) est piloté d'ICI, à
+  // côté de `panel` : deux états voisins, dans le même composant, ne peuvent
+  // pas diverger. Laissé dans MeetControls, il formait un second système
+  // d'état que rien ne reliait au panneau ouvert.
+  const [moreOpen, setMoreOpen] = useState(false);
   const [lastReadCount, setLastReadCount] = useState(0);
   const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
   const [meetingStartTime] = useState(() => Date.now());
   const [controlsVisible, setControlsVisible] = useState(true);
+  /**
+   * Hauteur RÉELLE du header, mesurée par `RoomHeader` (ResizeObserver).
+   *
+   * Les panneaux latéraux et la zone vidéo s'appuient dessus au lieu de
+   * répéter une constante : c'est la seule façon de garantir que le panneau
+   * Participants s'ouvre SOUS le header, et pas dessous par coïncidence.
+   */
+  const [headerHeight, setHeaderHeight] = useState(HEADER_FALLBACK_HEIGHT);
+  const handleHeaderHeight = useCallback((height: number) => {
+    setHeaderHeight(height);
+  }, []);
   const [handRaiseNotifications, setHandRaiseNotifications] = useState<Array<{id: string; name: string}>>([]);
   const lastHandRaiseTimeRef = useRef<Map<string, number>>(new Map());
   const lastSoundPlayRef = useRef<Map<string, number>>(new Map());
   const handleScreenTap = () => {
-  setControlsVisible(prev => !prev);
-};
+    setControlsVisible(prev => !prev);
+  };
   const participants = useParticipants();
   const { chatMessages } = useChat();
   const { requests: lobbyRequests, refresh: refreshLobby } = useLobbyRequests(roomId, isHost);
+  // Participant local lu directement depuis LiveKit : le state miroir
+  // intermédiaire provoquait un rendu supplémentaire à chaque changement.
   const { localParticipant } = useLocalParticipant();
 
-// Dans ton composant :
-  const handleHandRaise = useCallback((payload: HandPayload) => {
+  // Dans ton composant :
+  const handleHandRaise = useCallback((payload: { identity: string; name: string; raised: boolean }) => {
     // Callback when a hand raise event is received (only for raised hands)
     if (!payload.raised) return;
 
@@ -262,10 +312,9 @@ function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLa
       const lastSoundTime = lastSoundPlayRef.current.get(payload.identity) ?? 0;
       if (now - lastSoundTime > 100) { // Only play if at least 100ms since last sound for this identity
         lastSoundPlayRef.current.set(payload.identity, now);
-        const audio = new Audio("/Meet.mp3");
-        audio.play().catch(_ => {
-          // Handle error silently to avoid unhandled promise rejection
-        });
+        // Même module que les sons d'arrivée/départ : une seule politique
+        // d'échec pour tous les sons de la réunion.
+        playSound(SOUND_HAND_RAISE);
       }
     }
 
@@ -275,6 +324,10 @@ function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLa
       { id: Math.random().toString(36), name: payload.name || payload.identity }
     ]);
   }, [localParticipant]);
+
+  // Les sons d'arrivée et de départ sont joués par `useParticipantNotifications`,
+  // qui possède déjà la seule référence fiable de la composition de la
+  // réunion. Un second écouteur ici produisait un doublon sur chaque arrivée.
 
   const { raisedHands, isHandRaised, toggleHand } = useHandRaise(handleHandRaise);
   const { reactions, sendReaction } = useReactions();
@@ -290,10 +343,22 @@ function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLa
     panel === "chat" ? 0 : Math.max(0, chatMessages.length - lastReadCount);
 
   function togglePanel(next: PanelState) {
+    // Un panneau latéral et le menu « Plus d'options » ne peuvent pas être
+    // ouverts en même temps : le menu recouvrirait le panneau, et le panneau
+    // recouvrirait le menu. L'exclusion est posée ICI, en un seul endroit,
+    // pour les deux sens.
+    setMoreOpen(false);
     setPanel((current) => {
       const nextPanel = current === next ? "none" : next;
       if (nextPanel === "chat") setLastReadCount(chatMessages.length);
       return nextPanel;
+    });
+  }
+
+  function toggleMore() {
+    setMoreOpen((current) => {
+      if (!current) setPanel("none");
+      return !current;
     });
   }
 
@@ -303,16 +368,36 @@ function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLa
   }, []); // Only depends on stable setHandRaiseNotifications setter
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-meet-bg">
-      {/* PLUS DE HEADER — la vidéo commence tout en haut */}
-       {/* Bannière de connexion (reconnexion, perdue, rétablie) */}
-      <ConnectionBanner />
+    <div className="relative flex h-full flex-col overflow-hidden bg-meet-bg">
+      {/* La bannière de connexion est rendue une seule fois, dans `RoomPage` :
+          la dupliquer ici superposait deux bannières `fixed` identiques. */}
 
-<div className={`flex min-h-0 flex-1 overflow-hidden ${isMobile ? "" : "pb-16 sm:pb-20"}`}>
-  <main
-  className="relative min-w-0 flex-1 overflow-hidden"
-  onClick={!isWhiteboardOpen ? handleScreenTap : undefined}
->         
+      {/* Chrome de réunion flottant, posé par-dessus la vidéo */}
+      <RoomHeader
+        roomId={roomId}
+        endsAt={endsAt}
+        participantCount={participants.length}
+        onOpenParticipants={() => togglePanel("participants")}
+        isParticipantsOpen={panel === "participants"}
+        onHeightChange={handleHeaderHeight}
+      />
+
+      {/* Le `paddingTop` mesure la hauteur réelle du header : la zone vidéo ET
+          les panneaux latéraux commencent donc exactement sous lui. Auparavant
+          seul `<main>` compensait (`pt-14`) — les panneaux, eux, démarraient à
+          y=0 et leur barre de titre se mélangeait avec le header.
+
+          `pb-16/20` réserve la hauteur de la barre de contrôle : la zone
+          mesurée par le moteur de layout correspond ainsi exactement à
+          l'espace réellement visible. */}
+      <div
+        className={`flex min-h-0 flex-1 overflow-hidden ${isMobile ? "" : "pb-16 sm:pb-20"}`}
+        style={{ paddingTop: headerHeight }}
+      >
+        <main
+          className="relative min-w-0 flex-1 overflow-hidden"
+          onClick={!isWhiteboardOpen ? handleScreenTap : undefined}
+        >
  {isWhiteboardOpen ? (
             <Whiteboard
               roomId={roomId}
@@ -320,31 +405,41 @@ function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLa
               onClose={() => setIsWhiteboardOpen(false)}
             />
           ) : (
-            <VideoGrid />
+            <VideoGrid roomId={roomId} isHost={isHost} />
           )}
         </main>
 
-               {panel === "participants" && !isMobile && (
-          <aside className="hidden h-full w-80 shrink-0 overflow-y-auto border-l border-white/10 bg-meet-bg md:block">
+        {panel === "participants" && !isMobile && (
+          <aside className="h-full w-80 shrink-0 overflow-y-auto border-l border-white/10 bg-meet-bg">
             <ParticipantsPanel
               onClose={() => setPanel("none")}
               roomId={roomId}
               isHost={isHost}
               lobbyRequests={lobbyRequests}
               onLobbyRespond={refreshLobby}
+              headerHeight={headerHeight}
             />
           </aside>
         )}
         {panel === "chat" && !isMobile && (
-          <aside className="hidden h-full w-80 shrink-0 overflow-y-auto border-l border-white/10 bg-meet-bg md:block">
-            <ChatPanel roomId={roomId} onClose={() => setPanel("none")} />
+          <aside className="h-full w-80 shrink-0 overflow-y-auto border-l border-white/10 bg-meet-bg">
+            <ChatPanel
+              roomId={roomId}
+              onClose={() => setPanel("none")}
+              headerHeight={headerHeight}
+            />
           </aside>
         )}
       </div>
 
-      {/* Sur mobile, chat/participants s'ouvrent en plein écran plutôt qu'en sidebar */}
+      {/* Sur mobile, chat/participants s'ouvrent en plein écran plutôt qu'en
+          sidebar. Le calque commence SOUS le header (`top`) : le header reste
+          visible et cliquable, et le panneau ne se mélange jamais avec lui. */}
       {isMobile && panel !== "none" && (
-        <div className="fixed inset-0 z-40 bg-meet-bg">
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 bg-meet-bg"
+          style={{ top: headerHeight }}
+        >
           {panel === "participants" && (
             <ParticipantsPanel
               onClose={() => setPanel("none")}
@@ -352,23 +447,34 @@ function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLa
               isHost={isHost}
               lobbyRequests={lobbyRequests}
               onLobbyRespond={refreshLobby}
+              headerHeight={headerHeight}
             />
           )}
-          {panel === "chat" && <ChatPanel roomId={roomId} onClose={() => setPanel("none")} />}
+          {panel === "chat" && (
+            <ChatPanel
+              roomId={roomId}
+              onClose={() => setPanel("none")}
+              headerHeight={headerHeight}
+            />
+          )}
         </div>
       )}
 
       <ReactionOverlay reactions={reactions} />
 
-      {/* Indicateur mains levées */}
-           {raisedHands.size > 0 && (
-        <div className="pointer-events-none absolute right-4 top-4 z-20 animate-[slide-up_0.2s_ease-out]">
-          <div className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-xs text-white backdrop-blur-md shadow-lg">
-            <Hand size={14} className="text-yellow-400 flex-shrink-0" />
-            <span className="font-medium">
+      {/* Indicateur mains levées — placé SOUS le chrome de réunion (h-14)
+          pour ne jamais recouvrir le compteur, l'horloge ou le bouton
+          d'invitation. La pastille est bornée à la largeur de l'écran et la
+          liste des noms se tronque : avec dix mains levées, elle débordait
+          horizontalement sur mobile. */}
+      {raisedHands.size > 0 && (
+        <div className="pointer-events-none absolute inset-x-3 top-16 z-20 flex justify-end animate-[slide-up_0.2s_ease-out]">
+          <div className="flex min-w-0 max-w-full items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-xs text-white shadow-lg backdrop-blur-md ring-1 ring-white/10">
+            <Hand size={14} className="flex-shrink-0 text-yellow-400" />
+            <span className="truncate font-medium">
               {Array.from(raisedHands.values()).join(", ")}
             </span>
-            <span className="text-white/60">
+            <span className="flex-shrink-0 whitespace-nowrap text-white/60">
               {raisedHands.size === 1 ? "a levé la main" : "ont levé la main"}
             </span>
           </div>
@@ -409,8 +515,9 @@ function MeetingLayoutInner({ roomId, isHost, onLeave, onEndMeeting }: MeetingLa
         onSendReaction={sendReaction}
         onLeave={onLeave}
         onEndMeeting={onEndMeeting}
+        isMoreOpen={moreOpen}
+        onToggleMore={toggleMore}
         controlsVisible={controlsVisible}
-
       />
     </div>
   );

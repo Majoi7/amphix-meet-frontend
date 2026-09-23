@@ -28,6 +28,16 @@ interface MeetControlsProps {
   onSendReaction: (emoji: string) => void;
   onLeave: () => void;
   onEndMeeting: () => void;
+  /**
+   * Menu « Plus d'options » (tiroir desktop, feuille mobile).
+   *
+   * Piloté par le parent, et non par un état interne : c'est la seule façon
+   * de garantir qu'il ne reste jamais ouvert en même temps que le panneau
+   * Chat ou Participants. Un état local ici serait un second système d'état,
+   * incapable de voir ce que fait le parent.
+   */
+  isMoreOpen: boolean;
+  onToggleMore: () => void;
   /** Mobile uniquement — contrôle l'affichage/masquage auto de la barre. */
   controlsVisible?: boolean;
 }
@@ -177,26 +187,29 @@ function MobileControls({
   onSendReaction,
   onLeave,
   onEndMeeting,
+  isMoreOpen,
+  onToggleMore,
   controlsVisible = true,
 }: MeetControlsProps) {
-  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } =
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } =
     useLocalParticipant();
   const micToggle = useTrackToggle({ source: Track.Source.Microphone });
   const cameraToggle = useTrackToggle({ source: Track.Source.Camera });
+  const screenShareToggle = useTrackToggle({ source: Track.Source.ScreenShare });
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-  const [showSheet, setShowSheet] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
 
   useEffect(() => {
     if (!controlsVisible) {
-      setShowSheet(false);
       setShowEmojiPicker(false);
+      // Fermer la feuille passe par le parent : lui seul connaît l'état.
+      if (isMoreOpen) onToggleMore();
     }
-  }, [controlsVisible]);
+  }, [controlsVisible, isMoreOpen, onToggleMore]);
 
   const joinUrl = `${window.location.origin}/room/${roomId}`;
   const canShare = typeof navigator !== "undefined" && !!navigator.share;
@@ -237,7 +250,7 @@ function MobileControls({
   return (
     <>
       <div
-        className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-24 items-center justify-center gap-2.5 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-4 transition-transform duration-300 ease-out ${
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-24 items-center justify-center gap-2.5 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-4 transition-transform duration-300 ease-out ${
           controlsVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
@@ -309,8 +322,9 @@ function MobileControls({
         {/* Bouton "plus d'options" */}
         <button
           type="button"
-          onClick={() => setShowSheet(true)}
+          onClick={onToggleMore}
           aria-label="Plus d'options"
+          aria-expanded={isMoreOpen}
           className="pointer-events-auto relative ml-2 flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4285f4] to-[#1a5fd6] text-white shadow-[0_4px_20px_rgba(66,133,244,0.55)] transition-transform duration-200 ease-fluid hover:scale-105 active:scale-95"
         >
           <SwirlIcon className="h-7 w-7" />
@@ -320,21 +334,31 @@ function MobileControls({
         </button>
       </div>
 
-      {showSheet && (
+      {isMoreOpen && (
         <div className="fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowSheet(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onToggleMore} />
           <div className="absolute inset-x-0 bottom-0 animate-slide-up rounded-t-3xl bg-[#1a1a1a] pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl ring-1 ring-white/10">
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/20" />
             <div className="max-h-[70vh] overflow-y-auto px-3">
+              {/* Partage d'écran : absent de la barre mobile faute de place,
+                  mais indispensable — il vit donc dans la feuille d'options. */}
+              <SheetItem
+                icon={isScreenShareEnabled ? "stop_screen_share" : "present_to_all"}
+                filled={isScreenShareEnabled}
+                label={isScreenShareEnabled ? "Arrêter le partage" : "Partager l'écran"}
+                onClick={() => {
+                  void screenShareToggle.toggle();
+                  onToggleMore();
+                }}
+              />
+              {/* Chat et Participants referment la feuille via le parent, qui
+                  ouvre le panneau et referme « Plus d'options » d'un coup. */}
               <SheetItem
                 icon="chat"
                 filled={isChatOpen}
                 label="Chat"
                 badge={unreadChatCount > 0 ? unreadChatCount : undefined}
-                onClick={() => {
-                  onToggleChat();
-                  setShowSheet(false);
-                }}
+                onClick={onToggleChat}
               />
               <SheetItem
                 icon="group"
@@ -342,18 +366,15 @@ function MobileControls({
                 label="Participants"
                 badge={participantCount}
                 dot={pendingLobbyCount > 0}
-                onClick={() => {
-                  onToggleParticipants();
-                  setShowSheet(false);
-                }}
+                onClick={onToggleParticipants}
               />
               <SheetItem
                 icon="edit_note"
                 filled={isWhiteboardOpen}
                 label="Tableau blanc"
                 onClick={() => {
+                  onToggleMore();
                   onToggleWhiteboard();
-                  setShowSheet(false);
                 }}
               />
               <SheetItem
@@ -361,7 +382,7 @@ function MobileControls({
                 label={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
                 onClick={() => {
                   toggleFullscreen();
-                  setShowSheet(false);
+                  onToggleMore();
                 }}
               />
 
@@ -399,7 +420,7 @@ function MobileControls({
                 <button
                   type="button"
                   onClick={() => {
-                    setShowSheet(false);
+                    onToggleMore();
                     setShowEndConfirm(true);
                   }}
                   className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-[#ea4335]/40 px-3 py-3.5 text-sm font-medium text-[#ea4335] transition-colors hover:bg-[#ea4335]/10"
@@ -490,6 +511,8 @@ function DesktopControls({
   onSendReaction,
   onLeave,
   onEndMeeting,
+  isMoreOpen,
+  onToggleMore,
 }: MeetControlsProps) {
   const { isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
 
@@ -499,7 +522,6 @@ function DesktopControls({
   const { isFullscreen, toggleFullscreen } = useFullscreen();
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [openDeviceMenu, setOpenDeviceMenu] = useState<"none" | "mic" | "camera">("none");
-  const [showMore, setShowMore] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -507,12 +529,15 @@ function DesktopControls({
   const elapsed = useElapsed(meetingStartTime);
 
   useEffect(() => {
+    // Le clic extérieur ne fait que FERMER : sans le garde `isMoreOpen`, il
+    // rouvrirait le menu que l'utilisateur vient de fermer en cliquant ailleurs.
+    if (!isMoreOpen) return;
     function handleClickOutside(e: MouseEvent) {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setShowMore(false);
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) onToggleMore();
     }
-    if (showMore) document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showMore]);
+  }, [isMoreOpen, onToggleMore]);
 
   const joinUrl = `${window.location.origin}/room/${roomId}`;
   const canShare = typeof navigator !== "undefined" && !!navigator.share;
@@ -534,27 +559,34 @@ function DesktopControls({
         text: `Rejoins-moi sur Amphix Meet : ${roomId}`,
         url: joinUrl,
       });
-      setShowMore(false);
+      onToggleMore();
     } catch {
       // ignore
     }
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-20 items-center justify-between bg-gradient-to-t from-black/80 via-black/50 to-transparent px-6">
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-20 items-center justify-between px-3 sm:px-6">
+      {/* Vignette très douce : garde les contrôles lisibles sur n'importe
+          quelle image sans assombrir toute la hauteur de la vidéo. */}
+      <div className="absolute inset-x-0 bottom-0 -z-10 h-28 bg-gradient-to-t from-black/45 to-transparent" />
       {openDeviceMenu !== "none" && <DeviceSettingsMenu onClose={() => setOpenDeviceMenu("none")} />}
 
-      <div className="pointer-events-auto flex w-32 items-center gap-2">
-        <span className="text-sm font-medium text-white/70 tabular-nums">{elapsed}</span>
+      <div className="pointer-events-auto flex w-28 items-center gap-2 sm:w-32">
+        <span className="rounded-full bg-black/45 px-2.5 py-1 text-xs font-medium tabular-nums text-white/75 backdrop-blur-md ring-1 ring-white/10">
+          {elapsed}
+        </span>
         {raisedHandsCount > 0 && (
-          <span className="flex h-5 items-center gap-1 rounded-full bg-yellow-500/20 px-2 text-[10px] font-bold text-yellow-400">
+          <span className="flex h-6 items-center gap-1 rounded-full bg-yellow-500/20 px-2 text-[10px] font-bold text-yellow-400">
             <Icon name="back_hand" className="text-[11px]" />
             {raisedHandsCount}
           </span>
         )}
       </div>
 
-      <div className="pointer-events-auto flex flex-1 items-center justify-center gap-3">
+      <div className="pointer-events-auto flex flex-1 items-center justify-center">
+        {/* Barre principale : pilule flottante centrée, détachée du bord */}
+        <div className="flex items-center gap-1.5 rounded-[28px] border border-white/[0.06] bg-[#1e1f20]/[0.92] px-2.5 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.55)] backdrop-blur-xl">
         <div className="relative">
           <button
             type="button"
@@ -598,9 +630,9 @@ function DesktopControls({
           aria-pressed={isScreenShareEnabled}
           aria-label={isScreenShareEnabled ? "Arrêter le partage d'écran" : "Partager l'écran"}
           title={isScreenShareEnabled ? "Arrêter le partage d'écran" : "Partager l'écran"}
-          className={`flex h-12 w-12 items-center justify-center rounded-full transition-all ${
+          className={`flex h-12 w-12 items-center justify-center rounded-xl transition-all ${
             isScreenShareEnabled
-              ? "bg-[#8ab4f8] text-black hover:bg-[#aecbfa]"
+              ? "bg-[#a8c7fa] text-[#062e6f] hover:bg-[#bcd4fb]"
               : "bg-white/10 text-white hover:bg-white/20"
           }`}
         >
@@ -637,18 +669,19 @@ function DesktopControls({
         <button
           type="button"
           onClick={onLeave}
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ea4335] text-white transition-all hover:bg-[#d33426]"
+          className="ml-1 flex h-12 w-14 items-center justify-center rounded-full bg-[#ea4335] text-white transition-all hover:bg-[#d33426]"
         >
           <Icon name="call_end" filled className="text-[22px]" />
         </button>
+        </div>
       </div>
 
-      <div className="pointer-events-auto flex w-32 items-center justify-end gap-2">
+      <div className="pointer-events-auto flex w-28 items-center justify-end gap-2 sm:w-32">
         <button
           type="button"
           onClick={onToggleChat}
-          className={`relative flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors ${
-            isChatOpen ? "bg-[#8ab4f8] text-black" : "bg-white/10 hover:bg-white/20"
+          className={`relative flex h-11 w-11 items-center justify-center rounded-full text-white shadow-lg backdrop-blur-md ring-1 ring-white/10 transition-colors ${
+            isChatOpen ? "bg-[#a8c7fa] text-[#062e6f]" : "bg-black/45 hover:bg-black/65"
           }`}
         >
           <Icon name="chat" filled={isChatOpen} className="text-[20px]" />
@@ -662,22 +695,23 @@ function DesktopControls({
         <div className="relative" ref={moreRef}>
           <button
             type="button"
-            onClick={() => setShowMore((v) => !v)}
-            className={`flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors ${
-              showMore ? "bg-white/20" : "bg-white/10 hover:bg-white/20"
+            onClick={onToggleMore}
+            aria-expanded={isMoreOpen}
+            aria-label="Plus d'options"
+            className={`flex h-11 w-11 items-center justify-center rounded-full text-white shadow-lg backdrop-blur-md ring-1 ring-white/10 transition-colors ${
+              isMoreOpen ? "bg-black/70" : "bg-black/45 hover:bg-black/65"
             }`}
           >
             <Icon name="more_vert" className="text-[22px]" />
           </button>
 
-          {showMore && (
+          {isMoreOpen && (
             <div className="absolute bottom-full right-0 mb-2 w-72 rounded-2xl bg-[#1a1a1a] p-2 shadow-2xl ring-1 ring-white/10">
+              {/* Participants passe par le parent : il referme ce menu ET
+                  ouvre le panneau, dans le même mouvement. */}
               <button
                 type="button"
-                onClick={() => {
-                  onToggleParticipants();
-                  setShowMore(false);
-                }}
+                onClick={onToggleParticipants}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-white transition-colors hover:bg-white/5 ${
                   isParticipantsOpen ? "bg-white/5" : ""
                 }`}
@@ -693,8 +727,8 @@ function DesktopControls({
               <button
                 type="button"
                 onClick={() => {
+                  onToggleMore();
                   onToggleWhiteboard();
-                  setShowMore(false);
                 }}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-white transition-colors hover:bg-white/5 ${
                   isWhiteboardOpen ? "bg-white/5" : ""
@@ -708,7 +742,7 @@ function DesktopControls({
                 type="button"
                 onClick={() => {
                   toggleFullscreen();
-                  setShowMore(false);
+                  onToggleMore();
                 }}
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-white transition-colors hover:bg-white/5"
               >
@@ -722,7 +756,7 @@ function DesktopControls({
                   <button
                     type="button"
                     onClick={() => {
-                      setShowMore(false);
+                      onToggleMore();
                       setShowEndConfirm(true);
                     }}
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-[#ea4335] transition-colors hover:bg-[#ea4335]/10"

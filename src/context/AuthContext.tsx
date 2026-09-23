@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { AuthUser } from "../types";
 import * as authApi from "../lib/authApi";
+import { onSessionExpired } from "../lib/httpClient";
 import { setAccessToken } from "../lib/tokenStore";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
@@ -50,6 +51,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  /**
+   * FIN DE SESSION DÉCIDÉE PAR LE CLIENT.
+   *
+   * Quand le renouvellement est refusé — un 401 sur `/auth/refresh` —, la
+   * session est morte et rien ne la ressuscitera. `httpClient` le signale
+   * ici, et ce composant remet l'état local à zéro : le jeton en mémoire
+   * disparaît, `status` passe à `unauthenticated`, et `RequireAuth`
+   * ramène l'utilisateur à l'écran de connexion.
+   *
+   * On ne rappelle PAS `/auth/logout` : le refresh token est déjà révoqué
+   * ou expiré côté serveur, l'appel n'aurait rien à révoquer. Et sur une
+   * session déjà morte il ne ferait qu'un aller-retour de plus.
+   *
+   * Une seule notification par renouvellement — la promesse partagée de
+   * `httpClient` garantit qu'il n'y a qu'un renouvellement en vol —, et
+   * cette remise à zéro est idempotente : la recevoir deux fois ne
+   * déclencherait pas deux déconnexions, seulement deux fois le même état.
+   */
+  useEffect(() => {
+    return onSessionExpired(() => {
+      setAccessToken(null);
+      setUser(null);
+      setStatus("unauthenticated");
+    });
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

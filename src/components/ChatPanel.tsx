@@ -7,23 +7,48 @@ import { getAvatarColor } from "../lib/avatarColor";
 interface ChatPanelProps {
   roomId: string;
   onClose: () => void;
+  /**
+   * Hauteur du chrome de réunion, mesurée par `RoomHeader`.
+   *
+   * Sur mobile le panneau est en `fixed` : sans cette valeur il démarrerait à
+   * y=0 et sa barre de titre se superposerait au header. En desktop, le
+   * panneau est dans le flux et c'est le parent qui réserve la hauteur.
+   */
+  headerHeight: number;
 }
 
-export function ChatPanel({ roomId, onClose }: ChatPanelProps) {
+export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
   const { messages, send, isSending } = useMeetingChat(roomId);
   const { localParticipant } = useLocalParticipant();
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
+  /**
+   * L'utilisateur est-il « collé » en bas de la liste ?
+   *
+   * Ce drapeau est mis à jour par le DÉFILEMENT, pas au moment d'insérer un
+   * message. C'est indispensable : mesurer la distance au bas APRÈS l'insertion
+   * compte déjà la hauteur du nouveau message. Un message de plus de 100 px
+   * faisait donc passer la liste pour « non collée en bas », et le défilement
+   * ne descendait plus — le bug constaté.
+   */
+  const stickToBottomRef = useRef(true);
 
   const localIdentity = localParticipant?.identity ?? "";
+
+  function handleScroll() {
+    const el = listRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  }
 
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    if (isNearBottom) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    }
+    if (!stickToBottomRef.current) return;
+    // Défilement instantané, et non `smooth` : une animation en cours fait
+    // remonter `scrollTop`, ce qui ferait croire à tort que l'utilisateur a
+    // remonté la liste et couperait l'auto-défilement des messages suivants.
+    el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
   function handleSubmit(e: React.FormEvent) {
@@ -36,8 +61,14 @@ export function ChatPanel({ roomId, onClose }: ChatPanelProps) {
 
   const grouped = groupByDate(messages);
 
+  // Mobile : plein écran SOUS le header, comme le panneau Participants — les
+  // deux panneaux doivent se comporter pareil. En desktop le panneau est dans
+  // le flux (`sm:static`) et `top` est ignoré.
   return (
-    <aside className="fixed inset-x-0 top-0 bottom-16 z-40 flex h-auto w-full flex-col bg-[#0f0f0f] sm:static sm:bottom-auto sm:z-auto sm:h-full sm:w-80">
+    <aside
+      style={{ top: headerHeight }}
+      className="fixed inset-x-0 bottom-16 z-40 flex h-auto w-full flex-col bg-[#0f0f0f] sm:static sm:bottom-auto sm:z-auto sm:h-full sm:w-80"
+    >
       {/* Header */}
       <div className="flex h-[52px] flex-shrink-0 items-center justify-between border-b border-white/5 px-4">
         <h2 className="text-sm font-semibold text-white">Messages</h2>
@@ -52,7 +83,7 @@ export function ChatPanel({ roomId, onClose }: ChatPanelProps) {
       </div>
 
       {/* Messages */}
-      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white/5">
