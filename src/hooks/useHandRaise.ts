@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useDataChannel, useLocalParticipant } from "@livekit/components-react";
+import { playSound, SOUND_HAND_RAISE } from "../lib/sounds";
 
 export interface HandPayload {
   type: "hand";
@@ -41,6 +42,17 @@ export function useHandRaise(onHandRaise?: (payload: HandPayload) => void) {
   const toggleHand = useCallback(() => {
     const next = !isHandRaised;
     setIsHandRaised(next);
+
+    // Le son est joué ICI, chez celui qui lève la main.
+    //
+    // LiveKit ne renvoie pas l'écho de nos propres messages : le `message` de
+    // `useDataChannel` ne se déclenche que pour les messages venus d'un AUTRE
+    // participant. Sans ce déclenchement local, celui qui lève la main serait
+    // le seul à ne rien entendre. Les autres le reçoivent par le canal de
+    // données et le jouent dans `handleHandRaise` (Room.tsx) : chaque
+    // participant joue le son une fois, jamais deux.
+    if (next) playSound(SOUND_HAND_RAISE);
+
     const payload: HandPayload = {
       type: "hand",
       identity: localParticipant?.identity || "",

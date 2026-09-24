@@ -53,6 +53,16 @@ export function preloadSound(src: string): void {
 }
 
 /**
+ * Journalisation de développement.
+ *
+ * `playSound` avale volontairement ses erreurs : un son manquant ou bloqué ne
+ * doit jamais interrompre une réunion. Sans trace, une panne devenait donc
+ * indiagnosticable. Ces messages, limités aux builds de développement, rendent
+ * l'échec lisible sans rien changer au comportement en production.
+ */
+const DEV = import.meta.env.DEV;
+
+/**
  * Joue un son, une fois. Les erreurs sont avalées : un son manquant ou bloqué
  * par la politique d'autoplay ne doit jamais perturber la réunion.
  */
@@ -67,8 +77,17 @@ export function playSound(src: string): void {
     audio.addEventListener("ended", release);
     audio.addEventListener("error", release);
 
-    void audio.play().catch(release);
-  } catch {
-    // `Audio` indisponible — sans effet.
+    void audio
+      .play()
+      .then(() => {
+        if (DEV) console.log(`[Sound] playing ${src}`);
+      })
+      .catch((err: unknown) => {
+        if (DEV) console.warn(`[Sound] failed ${src}:`, err);
+        release();
+      });
+  } catch (err) {
+    // `Audio` indisponible — sans effet sur la réunion.
+    if (DEV) console.warn(`[Sound] failed ${src}:`, err);
   }
 }

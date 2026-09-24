@@ -24,7 +24,10 @@ import { ChatNotification } from "../components/ChatNotification";
 import { HandRaiseNotification } from "../components/HandRaiseNotification";
 import { ReactionOverlay } from "../components/ReactionOverlay";
 import { Hand } from "lucide-react";
-import { useParticipantNotifications } from "../hooks/useParticipantNotifications";
+import {
+  useParticipantNotifications,
+  useLeaveAnnouncement,
+} from "../hooks/useParticipantNotifications";
 import { useLobbyRequests } from "../hooks/useLobbyRequests";
 import { useHandRaise } from "../hooks/useHandRaise";
 import { useReactions } from "../hooks/useReactions";
@@ -33,6 +36,16 @@ import { playSound, SOUND_HAND_RAISE, SOUND_SORTIE } from "../lib/sounds";
 import type { DevicePreferences } from "../types";
 
 const LOBBY_POLL_INTERVAL_MS = 3000;
+
+/**
+ * Plafond d'attente de l'annonce de départ.
+ *
+ * L'annonce part avant la fermeture de la connexion : c'est ce qui permet aux
+ * autres participants de savoir que le départ est volontaire. On attend donc
+ * sa remise au moteur LiveKit — mais jamais indéfiniment : si le réseau ne
+ * répond pas, l'utilisateur doit pouvoir quitter la réunion quand même.
+ */
+const LEAVE_ANNOUNCE_TIMEOUT_MS = 400;
 
 /**
  * Hauteur du header avant sa première mesure.
@@ -134,24 +147,15 @@ export function RoomPage() {
   }, [waitingLobbyId]);
 
   /**
-   * Son de sortie — LOCAL, et joué une seule fois.
+   * Sortie de la salle — sans son.
    *
-   * `sortie.mp3` appartient à celui qui part : les autres participants ne
-   * doivent RIEN entendre. Il ne peut donc pas être déclenché depuis la liste
-   * des participants (ce code s'exécuterait chez tout le monde) : il est joué
-   * ici, au moment où l'utilisateur local provoque lui-même son départ.
-   *
-   * Le verrou couvre le cas où LiveKit rappelle `onDisconnected` derrière un
-   * départ volontaire : le son ne repart pas une seconde fois.
+   * Le son de sortie et l'annonce aux autres participants appartiennent au
+   * DÉPART VOLONTAIRE, qui est décidé dans `MeetingLayout` : c'est là que se
+   * trouvent les boutons « Quitter » et « Terminer ». Ici, on ne fait que
+   * libérer la salle, ce qui couvre aussi les sorties subies — erreur,
+   * connexion perdue, salle fermée côté serveur — pour lesquelles aucun son
+   * ne doit être joué, ni chez nous ni chez les autres.
    */
-  const leaveSoundPlayedRef = useRef(false);
-  function playLeaveSoundOnce() {
-    if (leaveSoundPlayedRef.current) return;
-    leaveSoundPlayedRef.current = true;
-    playSound(SOUND_SORTIE);
-  }
-
-  /** Sortie de la salle — sans son : voir `playLeaveSoundOnce`. */
   function exitRoom() {
     localStorage.removeItem(`amphix-chat-${roomId}`);
 
@@ -167,29 +171,9 @@ export function RoomPage() {
     navigate("/");
   }
 
-  /** Départ VOLONTAIRE (bouton « Quitter ») : on entend le son de sortie. */
-  function handleLeave() {
-    playLeaveSoundOnce();
-    exitRoom();
-  }
-
   /** Déconnexion SUBIE (erreur, salle fermée côté serveur) : aucun son. */
   function handleDisconnected() {
     exitRoom();
-  }
-
-  async function handleEndMeeting() {
-    if (!roomId) return;
-    // Joué AVANT l'appel réseau : le son part pendant que la salle se ferme,
-    // au lieu d'être coupé avec la page.
-    playLeaveSoundOnce();
-    try {
-      await endMeetingApi(roomId);
-    } catch (err) {
-      console.error("[RoomPage] Erreur lors de la fermeture de la réunion:", err);
-    } finally {
-      exitRoom();
-    }
   }
 
   function handleRoomError(err: Error) {
@@ -240,8 +224,7 @@ export function RoomPage() {
           roomId={roomId}
           isHost={connection.isHost}
           endsAt={connection.endsAt}
-          onLeave={handleLeave}
-          onEndMeeting={handleEndMeeting}
+          onExitRoom={exitRoom}
         />
       </ToastProvider>
       <RoomAudioRenderer />
@@ -254,11 +237,11 @@ interface MeetingLayoutProps {
   roomId: string;
   isHost: boolean;
   endsAt: string | null;
-  onLeave: () => void;
-  onEndMeeting: () => void;
+  /** Libère la salle (navigation, nettoyage) — ne joue aucun son. */
+  onExitRoom: () => void;
 }
 
-function MeetingLayout({ roomId, isHost, endsAt, onLeave, onEndMeeting }: MeetingLayoutProps) {
+function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProps) {
   const [panel, setPanel] = useState<PanelState>("none");
   // « Plus d'options » (menu desktop, feuille mobile) est piloté d'ICI, à
   // côté de `panel` : deux états voisins, dans le même composant, ne peuvent
@@ -338,6 +321,66 @@ function MeetingLayout({ roomId, isHost, endsAt, onLeave, onEndMeeting }: Meetin
   };
 
   useParticipantNotifications();
+
+  /**
+   * Annonce de départ volontaire, émise par CE participant.
+   *
+   * Elle doit partir AVANT la fermeture de la connexion : une fois la salle
+   * quittée, le message ne passerait plus. C'est ce qui distingue un vrai
+   * départ d'une simple disparition — onglet fermé, connexion perdue — pour
+   * lesquelles aucun son de sortie ne doit être joué.
+   */
+  const announceLeave = useLeaveAnnouncement();
+
+  /**
+   * Son de sortie — LOCAL, et joué une seule fois.
+   *
+   * `sortie.mp3` est joué par celui qui part, chez lui ; les autres
+   * participants le jouent à la réception de l'annonce (voir
+   * `useParticipantNotifications`). Personne ne l'entend donc deux fois. Le
+   * verrou couvre en plus le cas où LiveKit rappelle `onDisconnected` derrière
+   * un départ volontaire.
+   */
+  const leaveSoundPlayedRef = useRef(false);
+  const playLeaveSoundOnce = useCallback(() => {
+    if (leaveSoundPlayedRef.current) return;
+    leaveSoundPlayedRef.current = true;
+    playSound(SOUND_SORTIE);
+  }, []);
+
+  /** Séquence commune : son local, annonce aux autres, puis sortie. */
+  const leaveAndAnnounce = useCallback(async () => {
+    playLeaveSoundOnce();
+    await Promise.race([
+      announceLeave(),
+      new Promise<void>((resolve) => {
+        window.setTimeout(resolve, LEAVE_ANNOUNCE_TIMEOUT_MS);
+      }),
+    ]);
+  }, [announceLeave, playLeaveSoundOnce]);
+
+  /** Départ VOLONTAIRE (bouton « Quitter ») : on entend le son de sortie. */
+  const handleLeave = useCallback(async () => {
+    if (leaveSoundPlayedRef.current) return; // sortie déjà en cours
+    await leaveAndAnnounce();
+    onExitRoom();
+  }, [leaveAndAnnounce, onExitRoom]);
+
+  /**
+   * Fin de réunion pour tout le monde : même séquence, puis fermeture côté
+   * serveur. Le son et l'annonce partent AVANT l'appel réseau, pour ne pas
+   * être coupés avec la page.
+   */
+  const handleEndMeeting = useCallback(async () => {
+    await leaveAndAnnounce();
+    try {
+      await endMeetingApi(roomId);
+    } catch (err) {
+      console.error("[RoomPage] Erreur lors de la fermeture de la réunion:", err);
+    } finally {
+      onExitRoom();
+    }
+  }, [leaveAndAnnounce, roomId, onExitRoom]);
 
   const unreadChatCount =
     panel === "chat" ? 0 : Math.max(0, chatMessages.length - lastReadCount);
@@ -513,8 +556,8 @@ function MeetingLayout({ roomId, isHost, endsAt, onLeave, onEndMeeting }: Meetin
         onToggleWhiteboard={() => setIsWhiteboardOpen((v) => !v)}
         onToggleHand={handleToggleHand}
         onSendReaction={sendReaction}
-        onLeave={onLeave}
-        onEndMeeting={onEndMeeting}
+        onLeave={handleLeave}
+        onEndMeeting={handleEndMeeting}
         isMoreOpen={moreOpen}
         onToggleMore={toggleMore}
         controlsVisible={controlsVisible}
