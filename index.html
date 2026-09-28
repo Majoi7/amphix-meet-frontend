@@ -3,7 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      `viewport-fit=cover` : sans lui, `env(safe-area-inset-*)` vaut toujours 0
+      et les contrôles passent sous l'encoche / la barre d'accueil iOS.
+
+      `interactive-widget=resizes-content` : quand le clavier virtuel s'ouvre,
+      Chrome Android RÉDUIT la surface de mise en page au lieu de la recouvrir.
+      C'est ce qui garde le champ de saisie du chat visible, et ce qui fait
+      suivre `dvh` — donc la hauteur du panneau — au clavier réel.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <meta name="color-scheme" content="dark" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" />
     <title>Amphix Meet</title>

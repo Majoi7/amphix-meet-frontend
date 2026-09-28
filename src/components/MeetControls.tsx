@@ -8,6 +8,7 @@ import { DeviceSettingsMenu, DeviceSettingsToggle } from "./DeviceSettingsMenu";
 import { EmojiPicker } from "./EmojiPicker";
 import { useFullscreen } from "../hooks/useFullscreen";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { useElementSize } from "../hooks/useElementSize";
 
 interface MeetControlsProps {
   roomId: string;
@@ -40,6 +41,19 @@ interface MeetControlsProps {
   onToggleMore: () => void;
   /** Mobile uniquement — contrôle l'affichage/masquage auto de la barre. */
   controlsVisible?: boolean;
+  /**
+   * Remonte la hauteur RÉELLE de la barre, une fois mesurée.
+   *
+   * La barre est en `position: fixed` : elle ne réserve aucune place dans le
+   * flux, et la zone vidéo s'étend donc sous elle. Le parent a besoin de cette
+   * hauteur pour réserver exactement la bonne place — c'est la seule façon
+   * d'éviter que le bas de la grille soit masqué, sans pour autant figer une
+   * marge approximative.
+   *
+   * `MeetControls` ne fait QUE la mesurer : ni son dessin, ni ses boutons, ni
+   * sa mise en page ne changent.
+   */
+  onBarHeightChange?: (height: number) => void;
 }
 
 function Icon({
@@ -190,6 +204,7 @@ function MobileControls({
   isMoreOpen,
   onToggleMore,
   controlsVisible = true,
+  onBarHeightChange,
 }: MeetControlsProps) {
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } =
     useLocalParticipant();
@@ -247,10 +262,48 @@ function MobileControls({
     }
   }
 
+  /**
+   * Hauteur RÉELLE de la barre, remontée au parent.
+   *
+   * Mesurée ICI, sur la barre mobile elle-même, et non déduite d'une classe
+   * CSS recopiée dans `Room.tsx` : le jour où la barre change de hauteur, la
+   * réserve suit sans qu'aucun autre fichier ne soit à toucher.
+   *
+   * C'est exactement le dispositif déjà en place pour le header
+   * (`RoomHeader` → `onHeightChange` → `headerHeight` dans `Room.tsx`) : même
+   * hook de mesure, même garde `> 0`, même contrat de rappel. Rien de nouveau
+   * n'est introduit ici, seulement le même contrat appliqué à la barre.
+   *
+   * L'observateur est celui de `useElementSize`, le hook de mesure déjà
+   * utilisé pour la zone vidéo et pour le header : aucun observateur
+   * supplémentaire n'est créé. Le cache/défilement de la barre passe par
+   * `transform` (`translate-y-full`), qui ne change PAS la hauteur mesurée —
+   * la valeur n'oscille donc pas quand la barre se masque.
+   */
+  const { ref: barRef, size: barSize } = useElementSize<HTMLDivElement>();
+  useEffect(() => {
+    if (barSize.height > 0) onBarHeightChange?.(barSize.height);
+  }, [barSize.height, onBarHeightChange]);
+
   return (
     <>
+      {/*
+        Zones sûres — encoche, Dynamic Island, barre d'accueil.
+
+        Les insets sont posés en PADDING sur une barre dont la hauteur reste
+        `h-24`. C'est délibéré : la hauteur mesurée ne bouge donc pas, la
+        réserve calculée par `Room.tsx` non plus, et seule la rangée de boutons
+        remonte au-dessus de la barre d'accueil. Faire grandir la barre aurait
+        au contraire rogné la zone vidéo sur tous les appareils.
+
+        Le `max()` conserve les 16 px de `px-4` là où il n'y a pas d'encoche :
+        sur un appareil sans inset, la valeur retombe exactement sur l'ancienne
+        mise en page. En paysage sur un téléphone à encoche, les insets
+        latéraux (`left`/`right`) écartent en plus les boutons du capteur.
+      */}
       <div
-        className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-24 items-center justify-center gap-2.5 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-4 transition-transform duration-300 ease-out ${
+        ref={barRef}
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-24 items-center justify-center gap-2.5 bg-gradient-to-t from-black/70 via-black/35 to-transparent transition-transform duration-300 ease-out pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[env(safe-area-inset-bottom)] ${
           controlsVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
@@ -513,6 +566,7 @@ function DesktopControls({
   onEndMeeting,
   isMoreOpen,
   onToggleMore,
+  onBarHeightChange,
 }: MeetControlsProps) {
   const { isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
 
@@ -565,8 +619,34 @@ function DesktopControls({
     }
   }
 
+  /**
+   * Hauteur RÉELLE de la barre desktop, remontée au parent.
+   *
+   * Même rôle que dans `MobileControls` : la barre est en `position: fixed`,
+   * donc invisible pour la mise en page, et le parent doit réserver sa place
+   * pour que la grille ne passe pas dessous.
+   *
+   * Une seule mesure existe à un instant donné : `MeetControls` ne rend QUE la
+   * barre mobile ou QUE la barre desktop (`useIsMobile`), jamais les deux. La
+   * valeur remontée est donc toujours celle de la barre réellement affichée.
+   */
+  const { ref: barRef, size: barSize } = useElementSize<HTMLDivElement>();
+  useEffect(() => {
+    if (barSize.height > 0) onBarHeightChange?.(barSize.height);
+  }, [barSize.height, onBarHeightChange]);
+
+  /**
+   * `pb-[env(safe-area-inset-bottom)]` vaut exactement 0 sur un moniteur : la
+   * mise en page desktop est donc rigoureusement inchangée. Sur une tablette
+   * en paysage, en revanche, la barre d'accueil existe bel et bien — et c'est
+   * cette valeur-là qui remonte les boutons. Rien d'autre n'est touché, et la
+   * hauteur `h-20` reste la même, donc la réserve mesurée ne bouge pas.
+   */
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-20 items-center justify-between px-3 sm:px-6">
+    <div
+      ref={barRef}
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-20 items-center justify-between px-3 pb-[env(safe-area-inset-bottom)] sm:px-6"
+    >
       {/* Vignette très douce : garde les contrôles lisibles sur n'importe
           quelle image sans assombrir toute la hauteur de la vidéo. */}
       <div className="absolute inset-x-0 bottom-0 -z-10 h-28 bg-gradient-to-t from-black/45 to-transparent" />

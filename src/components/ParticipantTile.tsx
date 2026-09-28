@@ -10,7 +10,7 @@ import type {
   TrackReferenceOrPlaceholder,
   TrackReference,
 } from "@livekit/components-react";
-import { getAvatarColor } from "../lib/avatarColor";
+import { resolveAvatar } from "../lib/avatarColor";
 import { memo, useCallback, useState } from "react";
 import { PinMenu } from "./PinMenu";
 
@@ -35,20 +35,6 @@ interface ParticipantTileProps {
   /** Masqué quand on est seul en réunion — épingler n'a alors aucun sens. */
   showPinButton?: boolean;
   radius?: "lg" | "xl" | "2xl";
-}
-
-interface ParticipantMetadata {
-  avatarUrl?: string;
-}
-
-function parseAvatarUrl(metadata: string | undefined): string | undefined {
-  if (!metadata) return undefined;
-  try {
-    const parsed = JSON.parse(metadata) as ParticipantMetadata;
-    return parsed.avatarUrl || undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 const RADIUS_CLASS: Record<NonNullable<ParticipantTileProps["radius"]>, string> = {
@@ -101,9 +87,23 @@ export const ParticipantTile = memo(function ParticipantTile({
 
   const hasVideo = trackRef.publication && !trackRef.publication.isMuted;
   const displayName = trackRef.participant.name || trackRef.participant.identity;
-  const initials = displayName.trim().slice(0, 1).toUpperCase() || "?";
-  const avatarColor = getAvatarColor(trackRef.participant.identity);
-  const avatarUrl = parseAvatarUrl(trackRef.participant.metadata);
+
+  // Règle partagée avec le panneau participants, le chat et l'aperçu
+  // d'avant-réunion : photo si disponible, sinon initiales + couleur. La
+  // tuile n'a plus sa propre lecture du metadata — c'est ce qui faisait
+  // diverger l'affichage d'un même participant selon l'endroit.
+  const avatar = resolveAvatar({
+    identity: trackRef.participant.identity,
+    name: trackRef.participant.name,
+    metadata: trackRef.participant.metadata,
+  });
+
+  // URL dont le chargement a échoué. On mémorise l'URL fautive plutôt qu'un
+  // simple booléen : si la photo change, la nouvelle URL ne correspond plus
+  // et la photo réapparaît d'elle-même.
+  const [brokenPhotoUrl, setBrokenPhotoUrl] = useState<string | null>(null);
+  const photoUrl =
+    avatar.photoUrl && avatar.photoUrl !== brokenPhotoUrl ? avatar.photoUrl : null;
 
   const isCurrentlyGlobalPinned =
     !!globalPinnedTrack &&
@@ -136,22 +136,29 @@ export const ParticipantTile = memo(function ParticipantTile({
       ) : (
         <div
           className="relative flex h-full w-full items-center justify-center"
-          style={{ backgroundColor: avatarColor }}
+          style={{ backgroundColor: avatar.color }}
         >
           {/* Voile sombre pour garder le nom et les badges lisibles */}
           <div className="absolute inset-0 bg-black/20" />
-          {avatarUrl ? (
+          {photoUrl ? (
             <img
-              src={avatarUrl}
+              src={photoUrl}
               alt=""
+              // Une photo cassée — supprimée, hôte injoignable, image bloquée —
+              // ne doit jamais laisser une icône d'image brisée à la place du
+              // profil. On retombe sur les initiales.
+              onError={() => setBrokenPhotoUrl(photoUrl)}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
               className="relative h-16 w-16 rounded-full object-cover shadow-lg ring-4 ring-white/25 sm:h-24 sm:w-24"
             />
           ) : (
             <div
               className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/90 text-xl font-medium shadow-lg ring-4 ring-white/25 sm:h-24 sm:w-24 sm:text-3xl"
-              style={{ color: avatarColor }}
+              style={{ color: avatar.color }}
             >
-              {initials}
+              {avatar.initials}
             </div>
           )}
         </div>

@@ -9,6 +9,31 @@
     height: 100%;
   }
 
+  /*
+    Surface de l'application de réunion.
+
+    `vh` d'abord, `dvh` ensuite : deux déclarations de la même propriété, la
+    seconde ignorée sans risque par un navigateur qui ne connaît pas `dvh` —
+    c'est la convention déjà retenue dans `mathspace.css`, on la reprend.
+
+    Pourquoi pas `h-screen` (100vh) : sur iOS et Android, `100vh` vaut la
+    PLUS GRANDE hauteur possible, barre d'URL masquée. Deux conséquences
+    constatées :
+
+      - la barre de contrôle passait SOUS le chrome du navigateur ;
+      - surtout, la valeur n'était pas recalculée à la rotation. Le moteur de
+        layout, qui mesure la taille réelle de la zone vidéo, gardait donc les
+        dimensions de l'ANCIENNE orientation : un partage d'écran restait
+        dimensionné pour le portrait après passage en paysage.
+
+    `dvh` décrit la surface réellement visible et se recalcule à la rotation
+    comme à l'ouverture du clavier : la mesure reprend le dessus d'elle-même.
+  */
+  .app-viewport {
+    height: 100vh;
+    height: 100dvh;
+  }
+
   body {
     @apply bg-meet-bg text-meet-text-primary antialiased;
   }

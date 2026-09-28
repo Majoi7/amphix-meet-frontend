@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { useMediaPreview } from "../hooks/useMediaDevices";
-import { getAvatarColor } from "../lib/avatarColor";
+import { resolveAvatar } from "../lib/avatarColor";
 
 interface DevicePreviewProps {
   displayName: string;
@@ -29,7 +30,19 @@ export function DevicePreview({ displayName, avatarUrl, identity, onDeviceStateC
     onDeviceStateChange({ micEnabled, cameraEnabled: !cameraEnabled });
   }
 
-  const initials = displayName.trim().slice(0, 1).toUpperCase() || "?";
+  // Même règle que dans la réunion, et surtout la MÊME clé de couleur.
+  // L'ancien `identity ?? displayName` retombait sur `""` — `??` ne rattrape
+  // pas la chaîne vide — donc la couleur était toujours la première de la
+  // palette. `||` rétablit le repli voulu.
+  const avatar = resolveAvatar({
+    identity: identity || displayName,
+    name: displayName,
+    imageUrl: avatarUrl,
+  });
+
+  const [brokenPhotoUrl, setBrokenPhotoUrl] = useState<string | null>(null);
+  const photoUrl =
+    avatar.photoUrl && avatar.photoUrl !== brokenPhotoUrl ? avatar.photoUrl : null;
 
   return (
     <div className="w-full max-w-xl">
@@ -44,18 +57,21 @@ export function DevicePreview({ displayName, avatarUrl, identity, onDeviceStateC
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            {avatarUrl ? (
+            {photoUrl ? (
               <img
-                src={avatarUrl}
+                src={photoUrl}
                 alt=""
+                onError={() => setBrokenPhotoUrl(photoUrl)}
+                decoding="async"
+                referrerPolicy="no-referrer"
                 className="h-20 w-20 rounded-full object-cover"
               />
             ) : (
               <div
                 className="flex h-20 w-20 items-center justify-center rounded-full text-2xl font-medium text-meet-bg"
-                style={{ backgroundColor: getAvatarColor(identity ?? displayName) }}
+                style={{ backgroundColor: avatar.color }}
               >
-                {initials}
+                {avatar.initials}
               </div>
             )}
         

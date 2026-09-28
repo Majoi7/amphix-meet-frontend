@@ -9,16 +9,16 @@
  *
  *   GLOBAL PIN > LOCAL PIN > SCREEN SHARE > ACTIVE SPEAKER > AUTO LAYOUT
  *
- * Règle de forme : un PROFIL PARTICIPANT est toujours CARRÉ. Ce n'est pas une
- * propriété CSS posée après coup — c'est le moteur qui calcule un côté unique
- * et l'applique à la largeur comme à la hauteur. La règle ne concerne pas la
- * zone principale d'un partage d'écran, qui garde son ratio et n'est jamais
- * rognée.
+ * Règle de forme : toute tuile vidéo — caméra comme partage d'écran — est
+ * calculée au ratio 16:9. Ce n'est pas une propriété CSS posée après coup : le
+ * moteur choisit la PLUS GRANDE tuile 16:9 qui tient dans une cellule, donc une
+ * vidéo n'est jamais déformée. L'espace qui reste est réparti AUTOUR de la
+ * tuile, jamais dans sa forme.
  *
  * Quatre dispositions possibles, choisies par le moteur :
  *
  *  - `single` : une seule tuile, centrée ;
- *  - `grid`   : grille de carrés de taille égale ;
+ *  - `grid`   : grille de tuiles 16:9 de taille égale ;
  *  - `stage`  : un partage d'écran en zone principale, les autres en bandeau ;
  *  - `focus`  : un PROFIL ÉPINGLÉ en zone principale, environ deux fois plus
  *               grand qu'une tuile du bandeau (voir `focusLayout`).
@@ -52,6 +52,17 @@ export interface LayoutTile {
 export interface LayoutPin {
   identity: string;
   source: LayoutSource;
+  /**
+   * Tuile visée, quand elle est connue avec certitude.
+   *
+   * L'épingle GLOBALE vient de la base : elle ne connaît que
+   * `(identité, source)` et reste donc sans `id`. Quand il est présent, il
+   * tranche seul — un même participant peut publier DEUX partages d'écran
+   * (le tableau blanc en publie un, sous `Track.Source.ScreenShare`), et
+   * `(identité, source)` ne suffirait plus à désigner celui qui a été
+   * épinglé.
+   */
+  id?: string;
 }
 
 export interface LayoutViewport {
@@ -65,7 +76,16 @@ export interface LayoutInput {
   viewport: LayoutViewport;
   pins: {
     global: LayoutPin | null;
-    local: LayoutPin | null;
+    /**
+     * Épingles locales, dans leur ordre de pose.
+     *
+     * La PREMIÈRE encore présente l'emporte sur la zone principale ; les
+     * suivantes conservent une place privilégiée en tête du bandeau
+     * secondaire (`stripRank`). Un tableau plutôt qu'une valeur unique : rien
+     * n'interdit d'épingler deux intervenants, et le bandeau sait déjà les
+     * ordonner.
+     */
+    local: LayoutPin[];
   };
   /** L'utilisateur local partage-t-il son écran en ce moment ? */
   localScreenShareActive: boolean;
@@ -89,6 +109,14 @@ export type LayoutMode = "empty" | "single" | "grid" | "stage" | "focus";
 
 export interface LayoutResult {
   mode: LayoutMode;
+  /**
+   * Composition retenue en mode `grid` — null dans les autres modes.
+   *
+   * Exposée pour rendre la décision du moteur vérifiable de l'extérieur :
+   * c'est le résultat du score, pas une constante du code.
+   */
+  columns: number | null;
+  rows: number | null;
   /** Zone principale (une seule tuile proéminente) — null en mode grille pure. */
   main: LayoutSlot | null;
   /** Tuiles secondaires, avec leur position calculée. */
@@ -116,45 +144,34 @@ export interface LayoutResult {
 /* ------------------------------------------------------------------ */
 
 /**
- * Ratio d'un PROFIL PARTICIPANT : 1 (carré).
+ * Ratio cible d'une tuile vidéo : 16:9, pour une caméra COMME pour un partage
+ * d'écran.
  *
- * C'est une règle de rendu, pas une préférence esthétique. Elle vaut pour
- * tous les participants, quel que soit leur nombre, la taille de la fenêtre
- * ou la présence d'un partage d'écran.
+ * Les deux sources partagent le même cadre parce que la forme ne dit pas
+ * comment le contenu doit le remplir : une caméra est recadrée
+ * (`object-cover`), un partage est inscrit sans perte (`object-contain`). Un
+ * ratio unique garantit donc qu'aucune vidéo n'est déformée, sans jamais
+ * rogner du contenu partagé.
  */
-const PARTICIPANT_TILE_RATIO = 1;
-/** Ratio d'une tuile de partage d'écran (elle, jamais rognée). */
-const SCREEN_TILE_RATIO = 16 / 9;
-/** Ratio de la vignette caméra flottante (≈16:10, cf. partage-ecran.svg). */
-const SELF_VIEW_RATIO = 16 / 10;
+const TILE_RATIO = 16 / 9;
 
 /**
- * Retrait appliqué au côté d'une tuile carrée, pour aérer la composition.
+ * Coût d'une case vide, exprimé en fraction de la surface d'une tuile.
  *
- * Les cellules sont déjà séparées par `gap` ; ce facteur ajoute une marge
- * supplémentaire à l'intérieur de chaque cellule. Il rend aussi la grille
- * légèrement plus petite sans jamais casser le carré : `side` reste une
- * valeur unique, donc largeur et hauteur restent strictement égales.
+ * Maximiser la surface d'une tuile minimise déjà, à lui seul, l'espace perdu :
+ * `marges + trous = surface du conteneur − count × surface d'une tuile`. Ce
+ * terme ajoute ce que cette équivalence ne dit pas — un trou au milieu d'une
+ * grille se voit plus qu'une marge. Sans lui, neuf participants se
+ * répartiraient en 4 × 3 avec trois cases vides plutôt qu'en 3 × 3.
  */
-const SQUARE_TILE_FILL = 0.94;
-
-/**
- * Coût, en pixels de côté, d'une case vide.
- *
- * Sans cette pénalité, une rangée unique de tuiles minuscules battrait une
- * grille pleine : `side` y serait plus grand. Elle force à préférer une
- * grille complète tant que l'écart de taille reste raisonnable.
- */
-const EMPTY_CELL_COST_PX = 90;
+const EMPTY_CELL_COST_RATIO = 0.35;
 
 /** En dessous de cette largeur de tuile, le rendu devient illisible. */
 const MIN_TILE_W = 120;
 /** En dessous de cette hauteur de tuile, le rendu devient illisible. */
 const MIN_TILE_H = 80;
-/** Côté minimal d'une tuile carrée (bandeau secondaire). */
-const MIN_TILE_SIDE = 88;
-/** Largeur maximale d'une tuile unique centrée. */
-const SINGLE_MAX_W = 1180;
+/** Largeur maximale d'une cellule de bandeau secondaire. */
+const STRIP_CELL_MAX_W = 240;
 /** Taille maximale de la vignette caméra flottante. */
 const SELF_VIEW_MAX_W = 280;
 /** Taille minimale de la vignette caméra flottante. */
@@ -167,12 +184,13 @@ const STAGE_PADDING = 8;
 const COLUMN_STRIP_THRESHOLD = 1.35;
 
 /**
- * Rapport de taille visé, en mode « focus », entre le PROFIL ÉPINGLÉ et une
- * tuile du bandeau : le premier doit faire environ deux fois le second.
+ * Rapport de taille visé, en mode « focus », entre la tuile ÉPINGLÉE et une
+ * tuile du bandeau : la première doit faire environ deux fois la seconde.
  *
  * Ce n'est pas une transformation CSS : le moteur réserve réellement
- * `FOCUS_SCALE × s` de côté à la tuile épinglée, et `s` aux autres. La
- * géométrie est donc exacte, sans recouvrement ni débordement.
+ * `FOCUS_SCALE × c` de largeur à la tuile épinglée et `c` aux autres, chacune
+ * au ratio 16:9. La géométrie est donc exacte, sans recouvrement ni
+ * débordement.
  */
 const FOCUS_SCALE = 2;
 
@@ -180,9 +198,10 @@ const FOCUS_SCALE = 2;
  * Nombre de tuiles du bandeau qu'on cherche à garder visibles sans défiler en
  * mode « focus ».
  *
- * C'est ce qui borne le côté `s` du bandeau — et donc, par ricochet, la taille
- * du profil épinglé : un profil deux fois plus grand ne sert à rien si les
- * autres participants deviennent inatteignables. Au-delà, le bandeau défile.
+ * C'est ce qui borne la largeur `c` d'une cellule du bandeau — et donc, par
+ * ricochet, la taille de la tuile épinglée : une tuile deux fois plus grande ne
+ * sert à rien si les autres participants deviennent inatteignables. Au-delà, le
+ * bandeau défile.
  */
 const FOCUS_STRIP_MIN_VISIBLE = 2;
 
@@ -195,9 +214,21 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-/** Même tuile ? (même participant, même source) */
-function pinMatchesTile(pin: LayoutPin | null, tile: LayoutTile): boolean {
-  return !!pin && pin.identity === tile.identity && pin.source === tile.source;
+/**
+ * Cette épingle désigne-t-elle cette tuile ?
+ *
+ * Règle UNIQUE, exportée : le rendu s'en sert pour marquer une tuile
+ * « épinglée », le moteur pour élire la tuile principale. Deux
+ * implémentations séparées finiraient par diverger, et l'écart se verrait
+ * comme une épingle affichée sur une tuile qui n'est pas en zone principale.
+ *
+ * `id` l'emporte quand il est connu ; sinon on retombe sur le couple
+ * `(identité, source)`, seule information que porte l'épingle globale.
+ */
+export function pinMatchesTile(pin: LayoutPin | null, tile: LayoutTile): boolean {
+  if (!pin) return false;
+  if (pin.id) return pin.id === tile.id;
+  return pin.identity === tile.identity && pin.source === tile.source;
 }
 
 /**
@@ -222,7 +253,12 @@ function stripRank(
   pins: LayoutInput["pins"]
 ): number {
   if (tile.identity === main.identity) return 0;
-  if (pinMatchesTile(pins.global, tile) || pinMatchesTile(pins.local, tile)) return 1;
+  if (
+    pinMatchesTile(pins.global, tile) ||
+    pins.local.some((pin) => pinMatchesTile(pin, tile))
+  ) {
+    return 1;
+  }
   if (tile.source === "screenshare") return 2;
   return 3;
 }
@@ -245,8 +281,14 @@ function electMain(tiles: LayoutTile[], pins: LayoutInput["pins"]): LayoutTile |
   const globalPinned = tiles.find((t) => pinMatchesTile(pins.global, t));
   if (globalPinned) return globalPinned;
 
-  const localPinned = tiles.find((t) => pinMatchesTile(pins.local, t));
-  if (localPinned) return localPinned;
+  // Épingles locales : la PREMIÈRE posée encore présente l'emporte. L'ordre du
+  // tableau est celui des épinglages, donc stable — une épingle dont le
+  // participant a quitté la réunion ne correspond à aucune tuile et se saute
+  // sans laisser de place vide.
+  for (const pin of pins.local) {
+    const localPinned = tiles.find((t) => pinMatchesTile(pin, t));
+    if (localPinned) return localPinned;
+  }
 
   // Le partage d'écran le plus récent (le dernier arrivé dans la liste).
   const screenShares = tiles.filter((t) => t.source === "screenshare");
@@ -259,21 +301,44 @@ function electMain(tiles: LayoutTile[], pins: LayoutInput["pins"]): LayoutTile |
 }
 
 /**
- * Cherche la meilleure grille CARRÉE pour `count` tuiles dans une zone `w × h`.
+ * Cherche la meilleure composition pour `count` tuiles dans une zone `w × h`.
  *
- * Il n'y a plus de ratio cible à approcher : chaque cellule est ramenée à un
- * carré, dont le côté vaut `min(cellW, cellH)`. Le seul critère qui compte
- * devient donc la TAILLE de ce carré — on maximise `side`, en pénalisant les
- * cases vides pour qu'une rangée de tuiles minuscules ne batte pas une grille
- * pleine. Le résultat dépend entièrement de l'espace mesuré.
+ * Chaque candidat est une grille `cols × ceil(count / cols)`. Pour chacun, la
+ * tuile est le PLUS GRAND rectangle au ratio `ratio` qui tient dans une
+ * cellule : sa forme est donc toujours la bonne, et l'espace qui ne peut pas
+ * être occupé se retrouve autour d'elle, jamais dans sa déformation.
+ *
+ * Le score retient la tuile la plus grande, en retirant une fraction de sa
+ * surface par case vide. Ce critère suffit parce que minimiser l'espace perdu
+ * revient exactement à maximiser la surface d'une tuile :
+ *
+ *     marges + trous = surface du conteneur − count × surface d'une tuile
+ *
+ * Le terme de case vide ajoute ce que cette équivalence ne dit pas : un trou
+ * au milieu d'une grille se voit plus qu'une marge.
+ *
+ * Parcourir `cols` de 1 à `count` suffit : `rows = ceil(count / cols)` prend
+ * alors chaque valeur de 1 à `count`, donc aucune composition utile n'est
+ * oubliée, sans double boucle. Le coût est linéaire en `count`.
+ *
+ * Le résultat ne dépend QUE de `count`, `w`, `h`, `gap` et `ratio` : la même
+ * surface redonne toujours la même grille, et rien n'est codé par nombre de
+ * participants.
  */
-function bestSquareGrid(
+function bestGrid(
   count: number,
   w: number,
   h: number,
-  gap: number
-): { cols: number; rows: number; side: number } {
-  let best: { cols: number; rows: number; side: number; score: number } | null = null;
+  gap: number,
+  ratio: number
+): { cols: number; rows: number; tileW: number; tileH: number } {
+  let best: {
+    cols: number;
+    rows: number;
+    tileW: number;
+    tileH: number;
+    score: number;
+  } | null = null;
 
   for (let cols = 1; cols <= count; cols++) {
     const rows = Math.ceil(count / cols);
@@ -281,29 +346,29 @@ function bestSquareGrid(
     const cellH = (h - gap * (rows - 1)) / rows;
     if (cellW <= 0 || cellH <= 0) continue;
 
-    const side = Math.min(cellW, cellH) * SQUARE_TILE_FILL;
+    const tileW = Math.min(cellW, cellH * ratio);
+    const tileH = tileW / ratio;
     const emptyRatio = (cols * rows - count) / count;
-    const score = side - emptyRatio * EMPTY_CELL_COST_PX;
+    const score = tileW * tileH * (1 - emptyRatio * EMPTY_CELL_COST_RATIO);
 
     if (!best || score > best.score) {
-      best = { cols, rows, side, score };
+      best = { cols, rows, tileW, tileH, score };
     }
   }
 
   // Repli improbable (viewport dégénéré) : une seule colonne.
   if (!best) {
-    return { cols: 1, rows: count, side: Math.max(Math.min(w, h / count), 1) };
+    const tileW = Math.max(w, 1);
+    return { cols: 1, rows: count, tileW, tileH: Math.max(tileW / ratio, 1) };
   }
   return best;
 }
 
 /**
- * Place `count` cellules CARRÉES de `side × side` dans une zone `w × h`.
+ * Place `count` cellules `tileW × tileH` dans une zone `w × h`.
  * Chaque rangée incomplète est centrée horizontalement — c'est ce qui
- * distingue une grille « moteur de layout » d'un `grid-cols-4` rigide.
- *
- * Largeur et hauteur reçoivent la MÊME valeur : le carré est garanti par la
- * géométrie calculée, pas par une propriété CSS appliquée après coup.
+ * distingue une grille « moteur de layout » d'un `grid-cols-4` rigide, et ce
+ * qui évite qu'une dernière rangée à une tuile se retrouve collée à gauche.
  */
 function placeGrid(
   count: number,
@@ -311,10 +376,11 @@ function placeGrid(
   h: number,
   gap: number,
   cols: number,
-  side: number
+  tileW: number,
+  tileH: number
 ): LayoutRect[] {
   const rows = Math.ceil(count / cols);
-  const totalH = rows * side + (rows - 1) * gap;
+  const totalH = rows * tileH + (rows - 1) * gap;
   const offsetY = Math.max((h - totalH) / 2, 0);
 
   const rects: LayoutRect[] = [];
@@ -322,25 +388,28 @@ function placeGrid(
     const row = Math.floor(i / cols);
     const col = i % cols;
     const inRow = Math.min(cols, count - row * cols);
-    const rowW = inRow * side + (inRow - 1) * gap;
+    const rowW = inRow * tileW + (inRow - 1) * gap;
     const offsetX = Math.max((w - rowW) / 2, 0);
 
     rects.push({
-      x: offsetX + col * (side + gap),
-      y: offsetY + row * (side + gap),
-      w: side,
-      h: side,
+      x: offsetX + col * (tileW + gap),
+      y: offsetY + row * (tileH + gap),
+      w: tileW,
+      h: tileH,
     });
   }
   return rects;
 }
 
-/** Rectangle 16:9 (ou autre ratio) centré dans une zone, avec marge. */
+/** Plus grand rectangle au ratio demandé, centré dans une zone, avec marge. */
 function centeredBox(w: number, h: number, ratio: number, padding: number): LayoutRect {
   const availW = Math.max(w - padding * 2, 1);
   const availH = Math.max(h - padding * 2, 1);
 
-  let boxW = Math.min(availW, SINGLE_MAX_W);
+  // Aucun plafond de largeur : une réunion à une personne, ou un partage
+  // d'écran seul, doit occuper la surface disponible. C'est le ratio qui borne
+  // la taille, jamais une constante arbitraire.
+  let boxW = availW;
   let boxH = boxW / ratio;
   if (boxH > availH) {
     boxH = availH;
@@ -354,16 +423,23 @@ function centeredBox(w: number, h: number, ratio: number, padding: number): Layo
   };
 }
 
-/** Vignette flottante ancrée en bas à droite d'une zone, sans jamais déborder. */
+/**
+ * Vignette flottante ancrée en bas à droite d'une zone, sans jamais déborder.
+ *
+ * Elle est au MÊME ratio que toutes les autres tuiles : c'est la caméra locale,
+ * et une caméra ne change pas de forme selon l'endroit où elle est dessinée.
+ * Un ratio propre à la vignette aurait rendu faux l'invariant du moteur — toute
+ * tuile vidéo est calculée au ratio `TILE_RATIO` — pour un gain nul.
+ */
 function selfViewRect(within: LayoutRect): LayoutRect {
   const margin = 16;
   let boxW = clamp(within.w * 0.18, SELF_VIEW_MIN_W, SELF_VIEW_MAX_W);
-  let boxH = boxW / SELF_VIEW_RATIO;
+  let boxH = boxW / TILE_RATIO;
 
   const maxH = within.h * 0.45;
   if (boxH > maxH) {
     boxH = maxH;
-    boxW = boxH * SELF_VIEW_RATIO;
+    boxW = boxH * TILE_RATIO;
   }
   // Ne jamais dépasser la zone, même sur un écran très étroit.
   boxW = Math.min(boxW, Math.max(within.w - margin * 2, 1));
@@ -387,6 +463,8 @@ export function computeLayout(input: LayoutInput): LayoutResult {
 
   const empty: LayoutResult = {
     mode: "empty",
+    columns: null,
+    rows: null,
     main: null,
     secondary: [],
     selfView: null,
@@ -408,9 +486,16 @@ export function computeLayout(input: LayoutInput): LayoutResult {
   const localScreenShareActive =
     input.localScreenShareActive || input.tiles.some((t) => t.isLocal && t.source === "screenshare");
 
-  const tiles = localScreenShareActive
+  const visibleTiles = localScreenShareActive
     ? input.tiles.filter((t) => !(t.isLocal && t.source === "camera"))
     : input.tiles;
+
+  // Ordre STABLE : c'est lui qui décide qui occupe quelle cellule. Sans lui,
+  // l'ordre rendu par LiveKit — qui peut changer quand une piste est
+  // republiée — ferait sauter les tuiles d'une place à l'autre sans qu'aucun
+  // participant ne soit entré ni sorti. `arrivalIndex` ne bouge jamais pendant
+  // la réunion : la copie évite de trier le tableau de l'appelant.
+  const tiles = [...visibleTiles].sort((a, b) => a.arrivalIndex - b.arrivalIndex);
 
   if (tiles.length === 0) return empty;
 
@@ -436,18 +521,20 @@ export function computeLayout(input: LayoutInput): LayoutResult {
    */
   const mainIsPinned =
     !!main &&
-    (pinMatchesTile(input.pins.global, main) || pinMatchesTile(input.pins.local, main));
+    (pinMatchesTile(input.pins.global, main) ||
+      input.pins.local.some((pin) => pinMatchesTile(pin, main)));
 
   /* --- 2. MODE ----------------------------------------------------- */
 
-  // Une seule tuile : centrée, taille bornée. Un profil participant est
-  // carré, un partage d'écran garde son ratio (on ne rogne jamais du
-  // contenu partagé).
+  // Une seule tuile : centrée, et la plus grande possible au ratio 16:9. Une
+  // réunion à une personne n'a aucune raison de s'afficher dans un carré : le
+  // ratio borne la taille, il ne réduit pas la surface utilisée.
   if (tiles.length === 1) {
-    const ratio = tiles[0].source === "screenshare" ? SCREEN_TILE_RATIO : PARTICIPANT_TILE_RATIO;
-    const rect = centeredBox(stage.w, stage.h, ratio, 8);
+    const rect = centeredBox(stage.w, stage.h, TILE_RATIO, 8);
     return {
       mode: "single",
+      columns: null,
+      rows: null,
       main: { tile: tiles[0], rect },
       secondary: [],
       selfView: null,
@@ -467,23 +554,36 @@ export function computeLayout(input: LayoutInput): LayoutResult {
   }
 
   // Le mode « scène » n'est légitime que si la zone principale est RÉELLEMENT
-  // un partage d'écran. Si une épingle y a placé une caméra alors qu'un
-  // partage existe ailleurs, on retombe sur la grille carrée : un profil
-  // participant ne doit jamais se retrouver étiré dans la zone principale.
+  // un partage d'écran. Si une épingle y a placé une caméra alors qu'un partage
+  // existe ailleurs, on retombe sur la grille : réserver une immense zone
+  // principale à une caméra pendant qu'un partage est réduit à une vignette
+  // inverserait la priorité — le contenu partagé est ce qu'on est venu voir.
   if (hasScreenShare && main && main.source === "screenshare") {
     return stageLayout(main, others, stage, gap, localCamera, input.pins);
   }
 
-  /* --- 3. GRILLE CARRÉE -------------------------------------------- */
+  /* --- 3. GRILLE 16:9 ---------------------------------------------- */
 
-  // Deux tuiles et plus : une seule et même règle, sans exception. La grille
-  // est calculée sur le côté du carré, pas sur un ratio cible — c'est ce qui
-  // garantit des tuiles réellement carrées à toutes les tailles d'écran.
-  const grid = bestSquareGrid(tiles.length, stage.w, stage.h, gap);
-  const rects = placeGrid(tiles.length, stage.w, stage.h, gap, grid.cols, grid.side);
+  // Deux tuiles et plus : une seule et même règle, sans exception. La
+  // composition (colonnes × rangées) n'est jamais déduite du nombre de
+  // participants : elle sort du score de `bestGrid`, calculé sur la surface
+  // réellement mesurée. Une même réunion peut donc donner 2 × 2 sur un écran
+  // large et 3 × 1 sur un écran bas, sans qu'aucune ligne ne le prévoie.
+  const grid = bestGrid(tiles.length, stage.w, stage.h, gap, TILE_RATIO);
+  const rects = placeGrid(
+    tiles.length,
+    stage.w,
+    stage.h,
+    gap,
+    grid.cols,
+    grid.tileW,
+    grid.tileH
+  );
 
   return {
     mode: "grid",
+    columns: grid.cols,
+    rows: grid.rows,
     main: null,
     secondary: tiles.map((tile, i) => ({ tile, rect: offsetRect(rects[i], stage) })),
     selfView: null,
@@ -509,8 +609,11 @@ function offsetRect(rect: LayoutRect, origin: LayoutRect): LayoutRect {
  * La caméra locale n'est PAS mise dans le bandeau : elle devient la vignette
  * flottante. C'est ce qui évite le double affichage constaté à l'audit.
  *
- * Les cellules du bandeau sont CARRÉES, comme partout ailleurs : un profil
- * participant ne change pas de forme selon l'endroit où il est rendu.
+ * Les cellules du bandeau sont au même ratio 16:9 que partout ailleurs : une
+ * tuile ne change pas de forme selon l'endroit où elle est rendue. C'est ce qui
+ * permet à un SECOND partage d'écran d'être lisible dans le bandeau, au lieu
+ * d'être écrasé dans un carré où son contenu se perdait entre deux bandes
+ * vides.
  */
 function stageLayout(
   main: LayoutTile,
@@ -533,10 +636,12 @@ function stageLayout(
 
   // Aucun secondaire : le partage occupe tout, la caméra locale flotte dessus.
   if (stripTiles.length === 0) {
-    const mainRect = centeredBox(stage.w, stage.h, SCREEN_TILE_RATIO, 8);
+    const mainRect = centeredBox(stage.w, stage.h, TILE_RATIO, 8);
     const absMain = offsetRect(mainRect, stage);
     return {
       mode: "stage",
+      columns: null,
+      rows: null,
       main: { tile: main, rect: absMain },
       secondary: [],
       selfView: selfViewTile ? { tile: selfViewTile, rect: selfViewRect(absMain) } : null,
@@ -559,16 +664,18 @@ function stageLayout(
 
   if (useColumn) {
     // --- Bandeau vertical à droite ---
-    const idealSide = clamp(
-      (stage.h - gap * (stripTiles.length - 1)) / stripTiles.length,
-      MIN_TILE_SIDE,
-      190
-    );
-    let stripW = clamp(idealSide, MIN_TILE_SIDE, stage.w * stripFraction);
-    stripW = clamp(stripW, 96, Math.max(stage.w - MIN_TILE_W - gap, 96));
+    // Largeur de cellule qui permettrait de tout afficher sans défiler, bornée
+    // pour rester une vignette et ne jamais devenir une seconde zone
+    // principale. La hauteur en découle : la cellule est au ratio 16:9, donc un
+    // partage d'écran y tient sans bandes noires, comme n'importe quelle caméra.
+    const idealCellW =
+      ((stage.h - gap * (stripTiles.length - 1)) / stripTiles.length) * TILE_RATIO;
+    let stripW = clamp(idealCellW, MIN_TILE_W, STRIP_CELL_MAX_W);
+    stripW = clamp(stripW, MIN_TILE_W, Math.max(stage.w * stripFraction, MIN_TILE_W));
+    stripW = clamp(stripW, MIN_TILE_W, Math.max(stage.w - MIN_TILE_W - gap, MIN_TILE_W));
 
-    const side = stripW;
-    const visible = Math.max(Math.floor((stage.h + gap) / (side + gap)), 1);
+    const cellH = stripW / TILE_RATIO;
+    const visible = Math.max(Math.floor((stage.h + gap) / (cellH + gap)), 1);
     stripScrolls = stripTiles.length > visible;
 
     mainRect.w = Math.max(stage.w - stripW - gap, MIN_TILE_W);
@@ -580,28 +687,25 @@ function stageLayout(
     stripRect.h = stage.h;
 
     stripTiles.forEach((tile, i) => {
-      const h = Math.min(side, stripRect.h);
       slots.push({
         tile,
         rect: {
           x: stripRect.x,
-          y: stripRect.y + i * (side + gap),
+          y: stripRect.y + i * (cellH + gap),
           w: stripW,
-          h,
+          h: Math.min(cellH, stripRect.h),
         },
       });
     });
   } else {
     // --- Bandeau horizontal en bas ---
-    const idealSide = clamp(
-      (stage.w - gap * (stripTiles.length - 1)) / stripTiles.length,
-      MIN_TILE_SIDE,
-      240
-    );
-    let stripH = clamp(idealSide, MIN_TILE_SIDE, stage.h * stripFraction);
+    const idealCellH =
+      (stage.w - gap * (stripTiles.length - 1)) / stripTiles.length / TILE_RATIO;
+    let stripH = clamp(idealCellH, MIN_TILE_H, STRIP_CELL_MAX_W / TILE_RATIO);
+    stripH = clamp(stripH, MIN_TILE_H, Math.max(stage.h * stripFraction, MIN_TILE_H));
 
-    const side = stripH;
-    const visible = Math.max(Math.floor((stage.w + gap) / (side + gap)), 1);
+    const cellW = stripH * TILE_RATIO;
+    const visible = Math.max(Math.floor((stage.w + gap) / (cellW + gap)), 1);
     stripScrolls = stripTiles.length > visible;
 
     mainRect.w = stage.w;
@@ -616,9 +720,9 @@ function stageLayout(
       slots.push({
         tile,
         rect: {
-          x: stripRect.x + i * (side + gap),
+          x: stripRect.x + i * (cellW + gap),
           y: stripRect.y,
-          w: Math.min(side, stripRect.w),
+          w: Math.min(cellW, stripRect.w),
           h: stripH,
         },
       });
@@ -637,6 +741,8 @@ function stageLayout(
 
   return {
     mode: "stage",
+    columns: null,
+    rows: null,
     main: { tile: main, rect: absMainRect },
     secondary,
     selfView,
@@ -652,19 +758,21 @@ function stageLayout(
  * DEUX FOIS la taille d'une tuile du bandeau.
  *
  * Le facteur n'est pas une transformation CSS posée après coup : le moteur
- * réserve réellement `FOCUS_SCALE × s` de côté à la tuile épinglée et `s` à
- * chacune des autres. La composition entière (zone principale + bandeau) est
- * ensuite centrée dans l'espace mesuré, donc :
+ * réserve réellement `FOCUS_SCALE × c` de largeur à la tuile épinglée et `c` à
+ * chacune des autres, `c` étant la largeur d'une cellule du bandeau. La
+ * composition entière (zone principale + bandeau) est ensuite centrée dans
+ * l'espace mesuré, donc :
  *
  *  - rien ne se chevauche et rien ne déborde, quelle que soit la fenêtre ;
- *  - le profil épinglé reste CARRÉ (`mainSide` sert de largeur ET de hauteur) ;
+ *  - la tuile épinglée est au ratio 16:9 comme toutes les autres — elle est
+ *    plus GRANDE, jamais d'une autre forme ;
  *  - le bandeau occupe tout l'axe perpendiculaire, ce qui lui permet
  *    d'afficher plusieurs tuiles sans les réduire.
  *
  * La caméra locale n'est PAS détournée en vignette flottante ici, contrairement
  * au mode « scène » : en focus, tous les profils — le sien compris — sont des
- * tuiles carrées du bandeau. La vignette flottante reste l'affichage propre au
- * partage d'écran.
+ * tuiles du bandeau. La vignette flottante reste l'affichage propre au partage
+ * d'écran.
  */
 function focusLayout(
   main: LayoutTile,
@@ -676,9 +784,11 @@ function focusLayout(
   const stripTiles = orderStripTiles(main, others, pins);
 
   if (stripTiles.length === 0) {
-    const rect = offsetRect(centeredBox(stage.w, stage.h, PARTICIPANT_TILE_RATIO, 8), stage);
+    const rect = offsetRect(centeredBox(stage.w, stage.h, TILE_RATIO, 8), stage);
     return {
       mode: "focus",
+      columns: null,
+      rows: null,
       main: { tile: main, rect },
       secondary: [],
       selfView: null,
@@ -692,75 +802,92 @@ function focusLayout(
   const useColumn = stage.w / stage.h >= COLUMN_STRIP_THRESHOLD;
   const keepVisible = Math.min(stripTiles.length, FOCUS_STRIP_MIN_VISIBLE);
 
-  // Côté d'une tuile du bandeau. Trois bornes, dans l'ordre où elles mordent :
-  //  1. la zone principale doit tenir — `FOCUS_SCALE × s` borné par l'axe
-  //     principal de la scène ;
-  //  2. la composition doit tenir dans l'axe transversal ;
+  // Largeur `c` d'une tuile du bandeau — sa hauteur en découle (`c / ratio`).
+  // Trois bornes, dans l'ordre où elles mordent :
+  //  1. la zone principale doit tenir : `FOCUS_SCALE × c` de large et
+  //     `FOCUS_SCALE × c / ratio` de haut ;
+  //  2. la composition entière doit tenir dans l'axe transversal ;
   //  3. le bandeau doit rester lisible : au moins `keepVisible` tuiles visibles.
   const side = Math.max(
-    MIN_TILE_SIDE,
+    MIN_TILE_W,
     useColumn
       ? Math.min(
-          stage.h / FOCUS_SCALE,
+          (stage.h * TILE_RATIO) / FOCUS_SCALE,
           (stage.w - gap) / (FOCUS_SCALE + 1),
-          (stage.h - gap * (keepVisible - 1)) / keepVisible
+          (TILE_RATIO * (stage.h - gap * (keepVisible - 1))) / keepVisible
         )
       : Math.min(
           stage.w / FOCUS_SCALE,
-          (stage.h - gap) / (FOCUS_SCALE + 1),
+          (TILE_RATIO * (stage.h - gap)) / (FOCUS_SCALE + 1),
           (stage.w - gap * (keepVisible - 1)) / keepVisible
         )
   );
 
-  // Jamais plus grand que la scène : sur un écran très étroit, mieux vaut un
-  // profil épinglé plus petit que prévu qu'une tuile qui déborde.
-  const mainSide = useColumn
-    ? Math.min(FOCUS_SCALE * side, stage.h, stage.w)
-    : Math.min(FOCUS_SCALE * side, stage.w, stage.h);
+  const cellW = side;
+  const cellH = side / TILE_RATIO;
 
-  const mainRect: LayoutRect = { x: 0, y: 0, w: mainSide, h: mainSide };
+  // Jamais plus grand que la scène : sur un écran très étroit, mieux vaut une
+  // tuile épinglée plus petite que prévu qu'une tuile qui déborde. La largeur
+  // est bornée par les DEUX axes et la hauteur en découle — le ratio 16:9 est
+  // donc préservé jusque dans ce repli.
+  const mainW = Math.min(FOCUS_SCALE * cellW, stage.w, stage.h * TILE_RATIO);
+  const mainH = mainW / TILE_RATIO;
+
+  const mainRect: LayoutRect = { x: 0, y: 0, w: mainW, h: mainH };
   const stripRect: LayoutRect = { x: 0, y: 0, w: 0, h: 0 };
 
   if (useColumn) {
-    const totalW = mainSide + gap + side;
+    const totalW = mainW + gap + cellW;
     const originX = Math.max((stage.w - totalW) / 2, 0);
 
     mainRect.x = originX;
-    mainRect.y = Math.max((stage.h - mainSide) / 2, 0);
+    mainRect.y = Math.max((stage.h - mainH) / 2, 0);
 
     // Le bandeau occupe TOUTE la hauteur : c'est ce qui lui permet d'afficher
     // deux tuiles là où la hauteur de la zone principale n'en laisserait
     // qu'une.
-    stripRect.x = originX + mainSide + gap;
+    stripRect.x = originX + mainW + gap;
     stripRect.y = 0;
-    stripRect.w = side;
+    stripRect.w = cellW;
     stripRect.h = stage.h;
   } else {
-    const totalH = mainSide + gap + side;
+    const totalH = mainH + gap + cellH;
     const originY = Math.max((stage.h - totalH) / 2, 0);
 
     mainRect.y = originY;
-    mainRect.x = Math.max((stage.w - mainSide) / 2, 0);
+    mainRect.x = Math.max((stage.w - mainW) / 2, 0);
 
     stripRect.x = 0;
-    stripRect.y = originY + mainSide + gap;
+    stripRect.y = originY + mainH + gap;
     stripRect.w = stage.w;
-    stripRect.h = side;
+    stripRect.h = cellH;
   }
 
   const slots: LayoutSlot[] = stripTiles.map((tile, i) => ({
     tile,
     rect: useColumn
-      ? { x: stripRect.x, y: stripRect.y + i * (side + gap), w: side, h: side }
-      : { x: stripRect.x + i * (side + gap), y: stripRect.y, w: side, h: side },
+      ? {
+          x: stripRect.x,
+          y: stripRect.y + i * (cellH + gap),
+          w: cellW,
+          h: Math.min(cellH, stripRect.h),
+        }
+      : {
+          x: stripRect.x + i * (cellW + gap),
+          y: stripRect.y,
+          w: Math.min(cellW, stripRect.w),
+          h: cellH,
+        },
   }));
 
   const capacity = useColumn
-    ? Math.floor((stripRect.h + gap) / (side + gap))
-    : Math.floor((stripRect.w + gap) / (side + gap));
+    ? Math.floor((stripRect.h + gap) / (cellH + gap))
+    : Math.floor((stripRect.w + gap) / (cellW + gap));
 
   return {
     mode: "focus",
+    columns: null,
+    rows: null,
     main: { tile: main, rect: offsetRect(mainRect, stage) },
     secondary: slots.map((slot) => ({
       tile: slot.tile,

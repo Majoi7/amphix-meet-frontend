@@ -57,6 +57,19 @@ const LEAVE_ANNOUNCE_TIMEOUT_MS = 400;
  */
 const HEADER_FALLBACK_HEIGHT = 56;
 
+/**
+ * Hauteur de la barre de contrôle avant sa première mesure.
+ *
+ * Même principe que le header, avec une nuance : la barre n'a PAS la même
+ * hauteur en mobile (`h-24`, 96 px) et en desktop (`h-20`, 80 px). Le repli
+ * prend donc la PLUS GRANDE des deux, pour ne jamais être plus petit que la
+ * barre réelle : une réserve trop grande se voit à peine le temps d'un rendu,
+ * alors qu'une réserve trop petite laisserait la vidéo DERRIÈRE la barre —
+ * exactement le défaut qu'on corrige. La hauteur mesurée remplace cette
+ * valeur dès le premier rendu de la barre.
+ */
+const CONTROL_BAR_FALLBACK_HEIGHT = 96;
+
 type PanelState = "none" | "chat" | "participants";
 
 interface ConnectionInfo {
@@ -147,6 +160,26 @@ export function RoomPage() {
   }, [waitingLobbyId]);
 
   /**
+   * Ces trois callbacks sont MÉMOÏSÉS, et ce n'est pas cosmétique.
+   *
+   * `LiveKitRoom` recâble sa connexion dans un effet dont `onError` fait
+   * partie des dépendances (`room-Bfb4OWAI.mjs:3933-3940`, tableau
+   * `[connect, token, connectOptions, room, onError, serverUrl, …]`). Une
+   * fonction redéclarée à chaque rendu change d'identité à chaque rendu :
+   * l'effet se relance, `room.connect()` repart, et comme chaque échec
+   * WebSocket déclenche un `GET /rtc/v1/validate` (`livekit-client.esm.mjs`
+   * `handleConnectionError`) sans aucun backoff — la raison `WebSocket` est
+   * absente de la liste `:31847` qui alimente `BackOffStrategy` — le client
+   * finit par se faire refuser en 429.
+   *
+   * `handleRoomError` appelle `setError`, donc elle provoquait elle-même le
+   * rendu suivant : le cycle s'entretenait tout seul.
+   *
+   * Toutes les dépendances réellement lues sont déclarées ; aucune closure
+   * périmée n'est introduite.
+   */
+
+  /**
    * Sortie de la salle — sans son.
    *
    * Le son de sortie et l'annonce aux autres participants appartiennent au
@@ -156,7 +189,7 @@ export function RoomPage() {
    * connexion perdue, salle fermée côté serveur — pour lesquelles aucun son
    * ne doit être joué, ni chez nous ni chez les autres.
    */
-  function exitRoom() {
+  const exitRoom = useCallback(() => {
     localStorage.removeItem(`amphix-chat-${roomId}`);
 
     if (!hadErrorRef.current) {
@@ -169,14 +202,14 @@ export function RoomPage() {
     }
 
     navigate("/");
-  }
+  }, [roomId, navigate]);
 
   /** Déconnexion SUBIE (erreur, salle fermée côté serveur) : aucun son. */
-  function handleDisconnected() {
+  const handleDisconnected = useCallback(() => {
     exitRoom();
-  }
+  }, [exitRoom]);
 
-  function handleRoomError(err: Error) {
+  const handleRoomError = useCallback((err: Error) => {
     console.error("[LiveKitRoom] Erreur de connexion:", err);
     console.error("[LiveKitRoom] Erreur message:", err.message);
     console.error("[LiveKitRoom] Erreur stack:", err.stack);
@@ -191,7 +224,7 @@ export function RoomPage() {
     setError(
       "La connexion à la réunion a été interrompue de façon inattendue. Réessaie de rejoindre."
     );
-  }
+  }, []);
 
   if (!roomId) {
     navigate("/");
@@ -215,7 +248,7 @@ export function RoomPage() {
       connect
       onDisconnected={handleDisconnected}
       onError={handleRoomError}
-      className="h-screen overflow-hidden"
+      className="app-viewport overflow-hidden"
       data-lk-theme="default"
     >
       <ConnectionBanner />
@@ -262,6 +295,21 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
   const [headerHeight, setHeaderHeight] = useState(HEADER_FALLBACK_HEIGHT);
   const handleHeaderHeight = useCallback((height: number) => {
     setHeaderHeight(height);
+  }, []);
+  /**
+   * Hauteur RÉELLE de la barre de contrôle, mesurée par `MeetControls`.
+   *
+   * La barre est en `position: fixed` : elle ne prend aucune place dans le
+   * flux, et la zone vidéo s'étend donc sous elle. Réserver sa hauteur est la
+   * seule façon de garantir que le bas de la grille reste VISIBLE et
+   * cliquable. Une valeur mesurée plutôt qu'une marge fixe : le jour où la
+   * barre change de hauteur, la réserve suit toute seule.
+   */
+  const [controlBarHeight, setControlBarHeight] = useState(
+    CONTROL_BAR_FALLBACK_HEIGHT
+  );
+  const handleControlBarHeight = useCallback((height: number) => {
+    setControlBarHeight(height);
   }, []);
   const [handRaiseNotifications, setHandRaiseNotifications] = useState<Array<{id: string; name: string}>>([]);
   const lastHandRaiseTimeRef = useRef<Map<string, number>>(new Map());
@@ -430,12 +478,15 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
           seul `<main>` compensait (`pt-14`) — les panneaux, eux, démarraient à
           y=0 et leur barre de titre se mélangeait avec le header.
 
-          `pb-16/20` réserve la hauteur de la barre de contrôle : la zone
-          mesurée par le moteur de layout correspond ainsi exactement à
-          l'espace réellement visible. */}
+          Le `paddingBottom` mesure la hauteur réelle de la barre de contrôle :
+          la zone mesurée par le moteur de layout correspond ainsi exactement à
+          l'espace réellement visible. Il remplace un `pb-16 sm:pb-20` qui était
+          à la fois fixe — donc faux dès que la barre changeait de taille — et
+          ABSENT en mobile (`isMobile ? ""`), où la grille passait donc sous la
+          barre. */}
       <div
-        className={`flex min-h-0 flex-1 overflow-hidden ${isMobile ? "" : "pb-16 sm:pb-20"}`}
-        style={{ paddingTop: headerHeight }}
+        className="flex min-h-0 flex-1 overflow-hidden"
+        style={{ paddingTop: headerHeight, paddingBottom: controlBarHeight }}
       >
         <main
           className="relative min-w-0 flex-1 overflow-hidden"
@@ -460,28 +511,34 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
               isHost={isHost}
               lobbyRequests={lobbyRequests}
               onLobbyRespond={refreshLobby}
-              headerHeight={headerHeight}
             />
           </aside>
         )}
         {panel === "chat" && !isMobile && (
           <aside className="h-full w-80 shrink-0 overflow-y-auto border-l border-white/10 bg-meet-bg">
-            <ChatPanel
-              roomId={roomId}
-              onClose={() => setPanel("none")}
-              headerHeight={headerHeight}
-            />
+            <ChatPanel roomId={roomId} onClose={() => setPanel("none")} />
           </aside>
         )}
       </div>
 
       {/* Sur mobile, chat/participants s'ouvrent en plein écran plutôt qu'en
-          sidebar. Le calque commence SOUS le header (`top`) : le header reste
-          visible et cliquable, et le panneau ne se mélange jamais avec lui. */}
+          sidebar.
+
+          Cette enveloppe est le SEUL endroit qui positionne les deux panneaux
+          mobiles : elle borne la surface entre le bas du header et le haut de
+          la barre de contrôle, tous deux MESURÉS. Les panneaux se contentent
+          ensuite de la remplir (`h-full`), au lieu de se positionner chacun de
+          leur côté — deux systèmes de placement pour la même surface finissent
+          toujours par diverger.
+
+          `bottom: controlBarHeight` est ce qui rend le champ de saisie du chat
+          accessible : la barre mobile mesure 96 px, alors que le panneau
+          s'arrêtait auparavant à `bottom-16` (64 px) et disparaissait donc
+          DERRIÈRE elle sur 32 px. */}
       {isMobile && panel !== "none" && (
         <div
-          className="fixed inset-x-0 bottom-0 z-40 bg-meet-bg"
-          style={{ top: headerHeight }}
+          className="fixed inset-x-0 z-40 bg-meet-bg"
+          style={{ top: headerHeight, bottom: controlBarHeight }}
         >
           {panel === "participants" && (
             <ParticipantsPanel
@@ -490,15 +547,10 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
               isHost={isHost}
               lobbyRequests={lobbyRequests}
               onLobbyRespond={refreshLobby}
-              headerHeight={headerHeight}
             />
           )}
           {panel === "chat" && (
-            <ChatPanel
-              roomId={roomId}
-              onClose={() => setPanel("none")}
-              headerHeight={headerHeight}
-            />
+            <ChatPanel roomId={roomId} onClose={() => setPanel("none")} />
           )}
         </div>
       )}
@@ -561,6 +613,7 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
         isMoreOpen={moreOpen}
         onToggleMore={toggleMore}
         controlsVisible={controlsVisible}
+        onBarHeightChange={handleControlBarHeight}
       />
     </div>
   );

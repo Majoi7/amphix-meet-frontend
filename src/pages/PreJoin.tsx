@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { DevicePreview } from "../components/DevicePreview";
 import { useAuth } from "../context/AuthContext";
+import { resolveAvatar } from "../lib/avatarColor";
 import type { DevicePreferences } from "../types";
 
 interface PreJoinProps {
@@ -26,6 +27,16 @@ export function PreJoin({ onJoin, isJoining, error }: PreJoinProps) {
     e.preventDefault();
     await onJoin(deviceState);
   }
+
+  // Même règle que dans la réunion, et même clé de couleur (`user.id`) — donc
+  // la même couleur avant et après l'entrée. Cette pastille utilisait
+  // auparavant un dégradé jaune codé en dur : la personne changeait de couleur
+  // en franchissant la porte.
+  const avatar = resolveAvatar({
+    identity: user?.id ?? "",
+    name: user?.name,
+    imageUrl: user?.avatarUrl,
+  });
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center gap-8 overflow-hidden bg-[#0a0a0a] px-4 py-8 sm:py-10 lg:flex-row lg:gap-20 lg:px-12">
@@ -63,15 +74,19 @@ export function PreJoin({ onJoin, isJoining, error }: PreJoinProps) {
         </div>
 
         <div className="mb-4 flex items-center gap-3 rounded-xl bg-white/[0.04] p-3 lg:mb-6 lg:p-4">
-          {user?.avatarUrl ? (
+          {avatar.photoUrl ? (
             <img
-              src={user.avatarUrl}
+              src={avatar.photoUrl}
               alt=""
+              referrerPolicy="no-referrer"
               className="size-8 shrink-0 rounded-full object-cover lg:size-9"
             />
           ) : (
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#FFD83D] to-[#F5A900] text-xs font-bold text-[#2B2115] lg:size-9">
-              {user?.name?.charAt(0).toUpperCase() ?? "?"}
+            <span
+              className="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-black lg:size-9"
+              style={{ backgroundColor: avatar.color }}
+            >
+              {avatar.initials}
             </span>
           )}
           <p className="truncate text-sm text-white/50">

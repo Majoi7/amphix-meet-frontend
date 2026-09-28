@@ -20,7 +20,8 @@ import {
   rejectLobbyRequest,
   type LobbyRequestItem,
 } from "../lib/meetingApi";
-import { getAvatarColor } from "../lib/avatarColor";
+import type { Participant } from "livekit-client";
+import { resolveAvatar } from "../lib/avatarColor";
 import { useToast } from "./ToastProvider";
 
 interface ParticipantsPanelProps {
@@ -29,15 +30,16 @@ interface ParticipantsPanelProps {
   isHost: boolean;
   lobbyRequests: LobbyRequestItem[];
   onLobbyRespond: () => void;
-  /**
-   * Hauteur du chrome de réunion, mesurée par `RoomHeader`.
-   *
-   * Sur mobile le panneau est en `fixed` : sans cette valeur il démarrerait à
-   * y=0 et sa barre de titre se superposerait au header. En desktop, le
-   * panneau est dans le flux et c'est le parent qui réserve la hauteur — la
-   * valeur n'est alors pas utilisée.
-   */
-  headerHeight: number;
+  /*
+    Plus de prop `headerHeight` : la géométrie mobile est désormais décidée par
+    `Room.tsx` seul, qui enveloppe le panneau dans un repère `fixed` borné par
+    `top: hauteur du header` et `bottom: hauteur de la barre de contrôle`.
+
+    Avant, le panneau portait lui-même son `top` et un `bottom-16` figé, tandis
+    que la barre de contrôle en fait 96 px (`h-24`) : il se glissait donc de
+    32 px sous elle, champ de saisie compris. Une seule source de vérité pour
+    les deux panneaux — et la valeur mesurée, jamais recopiée.
+  */
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -49,7 +51,6 @@ export function ParticipantsPanel({
   isHost,
   lobbyRequests,
   onLobbyRespond,
-  headerHeight,
 }: ParticipantsPanelProps) {
   const participants = useParticipants();
   const { localParticipant } = useLocalParticipant();
@@ -106,15 +107,13 @@ export function ParticipantsPanel({
     }
   }
 
-  // Mobile : plein écran SOUS le header. Le `top` est la hauteur MESURÉE du
-  // chrome de réunion — jamais une constante recopiée. En desktop, le panneau
-  // repasse dans le flux (`sm:static`) et le parent réserve déjà la hauteur du
-  // header : `top` est alors ignoré par le navigateur.
+  // Le panneau REMPLIT le repère que lui donne `Room.tsx` : `h-full` en mobile
+  // comme en desktop. Il ne se positionne plus lui-même et ne réserve plus rien
+  // pour la barre de contrôle — c'est le repère parent qui s'arrête au-dessus
+  // d'elle. `overflow-hidden` garantit qu'une liste trop longue défile dans le
+  // corps du panneau au lieu de déborder sous la barre.
   return (
-    <aside
-      style={{ top: headerHeight }}
-      className="fixed inset-x-0 bottom-16 z-40 flex h-auto w-full flex-col bg-[#0f0f0f] sm:static sm:bottom-auto sm:z-auto sm:h-full sm:w-80"
-    >
+    <aside className="flex h-full w-full flex-col overflow-hidden bg-[#0f0f0f] sm:w-80">
       {/* Header */}
       <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-white/5 px-4">
         <div className="flex items-center gap-2.5">
@@ -133,7 +132,12 @@ export function ParticipantsPanel({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-20 scrollbar-thin">
+      {/* `min-h-0` : sans lui, un enfant de flex refuse de rétrécir sous sa
+          hauteur de contenu et la liste déborde au lieu de défiler. Le `pb-20`
+          qui se trouvait ici compensait les 80 px d'une barre qui en fait 96 :
+          c'était un pansement sur une géométrie fausse, il n'a plus lieu
+          d'être maintenant que le repère parent s'arrête à la barre. */}
+      <div className="min-h-0 flex-1 overflow-y-auto pb-4 scrollbar-thin">
         {/* ═════ Salle d'attente ═════ */}
         {isHost && lobbyRequests.length > 0 && (
           <div className="m-3 overflow-hidden rounded-xl border border-yellow-500/10 bg-yellow-500/[0.03]">
@@ -195,15 +199,18 @@ function LobbyRequestRow({
   onApprove: () => void;
   onReject: () => void;
 }) {
-  const initials = request.name.trim().slice(0, 1).toUpperCase() || "?";
+  // Pas de photo possible ici : `LobbyRequestItem` (backend) ne transporte que
+  // le nom et l'identifiant du demandeur. On reste donc sur les initiales —
+  // mais avec la même couleur et la même convention que partout ailleurs.
+  const avatar = resolveAvatar({ identity: request.userId, name: request.name });
 
   return (
     <div className="flex items-center gap-3 px-3.5 py-2.5">
       <div
         className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-black"
-        style={{ backgroundColor: getAvatarColor(request.userId) }}
+        style={{ backgroundColor: avatar.color }}
       >
-        {initials}
+        {avatar.initials}
       </div>
       <span className="flex-1 truncate text-sm font-medium text-white/90">
         {request.name}
@@ -238,7 +245,7 @@ function ParticipantRow({
   onMute,
   onRemove,
 }: {
-  participant: any;
+  participant: Participant;
   isLocal: boolean;
   canModerate: boolean;
   isPending: boolean;
@@ -247,22 +254,47 @@ function ParticipantRow({
 }) {
   const isSpeaking = useIsSpeaking(participant);
   const displayName = participant.name || participant.identity;
-  const initials = displayName.trim().slice(0, 1).toUpperCase() || "?";
-  const color = getAvatarColor(participant.identity);
+
+  // Même règle que la tuile : photo si disponible, sinon initiales + couleur.
+  // Ce panneau ne lisait auparavant jamais le metadata — un participant
+  // pouvait donc avoir sa photo dans la grille et des initiales ici.
+  const avatar = resolveAvatar({
+    identity: participant.identity,
+    name: participant.name,
+    metadata: participant.metadata,
+  });
+
+  // URL dont le chargement a échoué. On mémorise l'URL fautive plutôt qu'un
+  // booléen, pour que la photo réapparaisse si elle change.
+  const [brokenPhotoUrl, setBrokenPhotoUrl] = useState<string | null>(null);
+  const photoUrl =
+    avatar.photoUrl && avatar.photoUrl !== brokenPhotoUrl ? avatar.photoUrl : null;
 
   return (
     <li className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[0.04]">
       {/* Avatar */}
       <div className="relative flex-shrink-0">
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-black transition-shadow ${
+          className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-black transition-shadow ${
             isSpeaking
               ? "ring-2 ring-green-400 ring-offset-2 ring-offset-[#0f0f0f]"
               : ""
           }`}
-          style={{ backgroundColor: color }}
+          style={{ backgroundColor: avatar.color }}
         >
-          {initials}
+          {photoUrl ? (
+            <img
+              src={photoUrl}
+              alt=""
+              onError={() => setBrokenPhotoUrl(photoUrl)}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            avatar.initials
+          )}
         </div>
         {isSpeaking && (
           <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0f0f0f] bg-green-500" />

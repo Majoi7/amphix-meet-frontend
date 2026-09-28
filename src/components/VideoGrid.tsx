@@ -7,7 +7,7 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import { useElementSize } from "../hooks/useElementSize";
 import { useGlobalPin } from "../hooks/useGlobalPin";
 import { authorizedRequest } from "../lib/httpClient";
-import { computeLayout, rectToStyle } from "../lib/layoutEngine";
+import { computeLayout, pinMatchesTile, rectToStyle } from "../lib/layoutEngine";
 import type {
   LayoutPin,
   LayoutRect,
@@ -17,6 +17,35 @@ import type {
 
 function sourceOf(track: TrackReferenceOrPlaceholder): "camera" | "screenshare" {
   return track.source === Track.Source.ScreenShare ? "screenshare" : "camera";
+}
+
+/**
+ * Clé d'identité d'une tuile — celle qui décide si deux pistes sont la MÊME
+ * tuile ou deux tuiles distinctes.
+ *
+ * Le cas qui oblige à ne pas s'arrêter à `(identité, source)` : le TABLEAU
+ * BLANC. `Whiteboard.tsx` publie sa piste sous `Track.Source.ScreenShare`
+ * avec `name: 'whiteboard'` — c'est un vrai partage d'écran du point de vue
+ * de LiveKit, et c'est voulu : c'est ce qui lui permet d'être diffusé comme
+ * n'importe quel partage.
+ *
+ * La conséquence, si la clé restait `identité-source` : un participant qui
+ * ouvre le tableau blanc PUIS partage son écran publie DEUX pistes de même
+ * source. La déduplication n'en gardait qu'une — l'autre disparaissait de
+ * l'affichage sans aucun signe, alors qu'elle était bien publiée et bien
+ * reçue.
+ *
+ * Le nom de piste est donc ajouté à la clé POUR LES PARTAGES D'ÉCRAN
+ * uniquement. Pas pour les caméras : un changement de caméra change le nom
+ * de piste, ce qui changerait la clé React, remonterait la tuile et
+ * couperait la vidéo le temps du remontage. Un partage d'écran, lui, ne
+ * change pas de nom de piste en cours de diffusion — et s'il s'arrête puis
+ * repart, la nouvelle piste remplace l'ancienne, qui n'est plus rendue.
+ */
+function tileKeyOf(track: TrackReferenceOrPlaceholder): string {
+  const base = `${track.participant.identity}-${track.source}`;
+  if (track.source !== Track.Source.ScreenShare) return base;
+  return `${base}-${track.publication?.trackName ?? ""}`;
 }
 
 /**
@@ -44,20 +73,27 @@ export function VideoGrid({ roomId, isHost }: { roomId?: string; isHost?: boolea
   );
 
   const isHostFlag = isHost ?? false;
-  // L'épingle locale est mémorisée par IDENTITÉ, pas par référence d'objet :
-  // LiveKit recrée les `TrackReference` au moindre changement (orateur actif,
-  // publication de piste). Comparer les références ferait perdre l'épingle
-  // sans aucun signe visible.
-  const [localPin, setLocalPin] = useState<LayoutPin | null>(null);
+  // Les épingles locales sont mémorisées par IDENTITÉ, pas par référence
+  // d'objet : LiveKit recrée les `TrackReference` au moindre changement
+  // (orateur actif, publication de piste). Comparer les références ferait
+  // perdre l'épingle sans aucun signe visible.
+  //
+  // Un TABLEAU plutôt qu'une épingle unique : le moteur sait déjà arbitrer
+  // plusieurs épingles (il retient la première encore présente comme tuile
+  // principale et range les autres en tête de bandeau). Les stocker toutes
+  // évite qu'épingler une seconde tuile efface silencieusement la première.
+  // La LISTE est locale à cet onglet, elle ne sort jamais d'ici.
+  const [localPins, setLocalPins] = useState<LayoutPin[]>([]);
   const globalPinState = useGlobalPin(roomId ?? "");
 
-  // Une seule tuile par couple (participant, source) — on garde caméra ET
-  // partage d'écran d'un même participant.
+  // Une seule tuile par piste distincte — on garde caméra ET partage d'écran
+  // d'un même participant, et même deux partages d'écran distincts (voir
+  // `tileKeyOf`).
   const deduplicatedTracks = useMemo(() => {
     const map = new Map<string, TrackReferenceOrPlaceholder>();
     tracks.forEach((track) => {
       if (!track) return;
-      const key = `${track.participant.identity}-${track.source}`;
+      const key = tileKeyOf(track);
       if (!map.has(key)) map.set(key, track);
     });
     return Array.from(map.values());
@@ -71,7 +107,7 @@ export function VideoGrid({ roomId, isHost }: { roomId?: string; isHost?: boolea
   const layoutTiles: LayoutTile[] = useMemo(() => {
     const order = arrivalOrderRef.current;
     return deduplicatedTracks.map((track) => {
-      const id = `${track.participant.identity}-${track.source}`;
+      const id = tileKeyOf(track);
       if (!order.has(id)) {
         order.set(id, arrivalCounterRef.current);
         arrivalCounterRef.current += 1;
@@ -97,8 +133,8 @@ export function VideoGrid({ roomId, isHost }: { roomId?: string; isHost?: boolea
             source: globalPinState.trackSource === "Camera" ? "camera" : "screenshare",
           }
         : null;
-    return { global, local: localPin };
-  }, [globalPinState.participantId, globalPinState.trackSource, localPin]);
+    return { global, local: localPins };
+  }, [globalPinState.participantId, globalPinState.trackSource, localPins]);
 
   // Le cœur : une fonction pure, recalculée seulement quand une entrée change.
   const layout = useMemo(
@@ -132,7 +168,7 @@ export function VideoGrid({ roomId, isHost }: { roomId?: string; isHost?: boolea
   const trackById = useMemo(() => {
     const map = new Map<string, TrackReferenceOrPlaceholder>();
     deduplicatedTracks.forEach((track) => {
-      map.set(`${track.participant.identity}-${track.source}`, track);
+      map.set(tileKeyOf(track), track);
     });
     return map;
   }, [deduplicatedTracks]);
@@ -149,14 +185,21 @@ export function VideoGrid({ roomId, isHost }: { roomId?: string; isHost?: boolea
   /* --- Actions ---------------------------------------------------- */
 
   const togglePin = useCallback((trackRef: TrackReferenceOrPlaceholder) => {
+    const id = tileKeyOf(trackRef);
     const candidate: LayoutPin = {
+      // La tuile visée est connue avec certitude ici : l'épingle porte donc son
+      // `id`, et non le seul couple (identité, source) — indispensable quand un
+      // participant publie à la fois le tableau blanc et un partage d'écran.
+      id,
       identity: trackRef.participant.identity,
       source: sourceOf(trackRef),
     };
-    setLocalPin((prev) =>
-      prev && prev.identity === candidate.identity && prev.source === candidate.source
-        ? null
-        : candidate
+    setLocalPins((prev) =>
+      // Épingler une tuile déjà épinglée la DÉSÉPINGLE. Les autres épingles
+      // restent : c'est ce qui rend le multi-épinglage utilisable.
+      prev.some((pin) => pin.id === id)
+        ? prev.filter((pin) => pin.id !== id)
+        : [...prev, candidate]
     );
   }, []);
 
@@ -199,10 +242,9 @@ export function VideoGrid({ roomId, isHost }: { roomId?: string; isHost?: boolea
     if (!trackRef) return null;
 
     const isScreenShare = slot.tile.source === "screenshare";
-    const isPinnedLocally =
-      !!pins.local &&
-      pins.local.identity === slot.tile.identity &&
-      pins.local.source === slot.tile.source;
+    // Règle partagée avec le moteur : la tuile marquée « épinglée » est
+    // exactement celle que le moteur a élue. Voir `pinMatchesTile`.
+    const isPinnedLocally = pins.local.some((pin) => pinMatchesTile(pin, slot.tile));
 
     // Dans un conteneur de défilement, les tuiles se placent relativement à
     // la fenêtre du bandeau, pas à la scène.
@@ -239,10 +281,23 @@ export function VideoGrid({ roomId, isHost }: { roomId?: string; isHost?: boolea
           onRequestGlobalPin={requestGlobalPin}
           isHost={isHostFlag}
           fill
-          // La vignette caméra locale est épinglable comme n'importe quelle
-          // autre : c'est la seule façon, en mode scène, de se remettre en
-          // zone principale. Elle l'excluait auparavant (`variant === "self"`).
-          showPinButton={canPin}
+          // Épinglage : DESKTOP UNIQUEMENT.
+          //
+          // Sur mobile, l'épingle est retirée — pas seulement son bouton : le
+          // menu « Pour moi uniquement / Pour tous les participants » n'est
+          // ouvrable que depuis ce bouton, donc ne plus l'afficher suffit à
+          // supprimer toute action tactile d'épinglage. Le bouton est en
+          // position absolue, il ne réservait de toute façon aucune place.
+          //
+          // Le système d'épingle lui-même reste entier (`togglePin`,
+          // `requestGlobalPin`, `useGlobalPin`) : il continue de fonctionner
+          // sur desktop, et la vignette locale y reste épinglable comme
+          // n'importe quelle autre.
+          //
+          // Une épingle GLOBALE posée depuis un poste desktop continue, elle,
+          // de s'appliquer sur mobile : c'est une décision de réunion, pas une
+          // préférence d'affichage local.
+          showPinButton={canPin && !isMobile}
           radius={variant === "main" ? "2xl" : "xl"}
           className="h-full w-full"
         />

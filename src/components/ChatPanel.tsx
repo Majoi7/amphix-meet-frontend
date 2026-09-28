@@ -1,27 +1,50 @@
-import { useEffect, useRef, useState } from "react";
-import { Send, X } from "lucide-react";
-import { useLocalParticipant } from "@livekit/components-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, Send, X } from "lucide-react";
+import { useLocalParticipant, useParticipants } from "@livekit/components-react";
 import { useMeetingChat } from "../hooks/useMeetingChat";
-import { getAvatarColor } from "../lib/avatarColor";
+import { useElementSize } from "../hooks/useElementSize";
+import { resolveAvatar } from "../lib/avatarColor";
 
 interface ChatPanelProps {
   roomId: string;
   onClose: () => void;
-  /**
-   * Hauteur du chrome de réunion, mesurée par `RoomHeader`.
-   *
-   * Sur mobile le panneau est en `fixed` : sans cette valeur il démarrerait à
-   * y=0 et sa barre de titre se superposerait au header. En desktop, le
-   * panneau est dans le flux et c'est le parent qui réserve la hauteur.
-   */
-  headerHeight: number;
 }
 
-export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
+export function ChatPanel({ roomId, onClose }: ChatPanelProps) {
   const { messages, send, isSending } = useMeetingChat(roomId);
   const { localParticipant } = useLocalParticipant();
+  const participants = useParticipants();
   const [draft, setDraft] = useState("");
-  const listRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Le metadata du participant, indexé par identité.
+   *
+   * Un message ne transporte que `from.identity` et `from.name` — pas le
+   * metadata. Sans cette table, le chat ne pouvait pas afficher la photo et
+   * retombait systématiquement sur les initiales, alors que la tuile du même
+   * participant affichait sa photo. Un expéditeur déjà parti n'est plus dans
+   * la table : il retombe proprement sur ses initiales.
+   */
+  const metadataByIdentity = useMemo(() => {
+    const map = new Map<string, string>();
+    // `Participant.metadata` est optionnel : on normalise en chaîne vide plutôt
+    // que de transporter `undefined`, pour que la valeur lue soit toujours du
+    // type attendu par `resolveAvatar`.
+    participants.forEach((participant) =>
+      map.set(participant.identity, participant.metadata ?? "")
+    );
+    return map;
+  }, [participants]);
+  /**
+   * Le conteneur de messages est mesuré par le hook de mesure du projet.
+   *
+   * Sa hauteur change à la ROTATION et à l'OUVERTURE DU CLAVIER virtuel — le
+   * `viewport-fit` / `interactive-widget` de `index.html` fait réellement
+   * rétrécir la surface. Sans cette mesure, la liste restait calée sur
+   * l'ancienne hauteur et le dernier message passait sous le clavier.
+   */
+  const { ref: listRef, size: listSize } = useElementSize<HTMLDivElement>();
+
   /**
    * L'utilisateur est-il « collé » en bas de la liste ?
    *
@@ -32,13 +55,32 @@ export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
    * ne descendait plus — le bug constaté.
    */
   const stickToBottomRef = useRef(true);
+  /**
+   * Même information, mais RÉACTIVE.
+   *
+   * Le drapeau ci-dessus est une `ref` : il pilote le défilement sans
+   * provoquer de rendu, ce qui est voulu. Mais il ne peut pas décider de
+   * l'affichage du bouton « revenir au dernier message », qui doit apparaître
+   * et disparaître. D'où ce second état, tenu à jour au même endroit — une
+   * seule condition, deux usages, jamais de divergence possible.
+   */
+  const [atBottom, setAtBottom] = useState(true);
 
   const localIdentity = localParticipant?.identity ?? "";
 
   function handleScroll() {
     const el = listRef.current;
     if (!el) return;
-    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    const next = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    stickToBottomRef.current = next;
+    setAtBottom(next);
+  }
+
+  function scrollToLatest() {
+    const el = listRef.current;
+    stickToBottomRef.current = true;
+    setAtBottom(true);
+    if (el) el.scrollTop = el.scrollHeight;
   }
 
   useEffect(() => {
@@ -49,7 +91,23 @@ export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
     // remonter `scrollTop`, ce qui ferait croire à tort que l'utilisateur a
     // remonté la liste et couperait l'auto-défilement des messages suivants.
     el.scrollTop = el.scrollHeight;
-  }, [messages.length]);
+  }, [messages.length, listRef]);
+
+  /**
+   * Recaler la liste quand sa HAUTEUR change, et non seulement quand un
+   * message arrive.
+   *
+   * C'est le cas de la rotation et du clavier virtuel : la surface rétrécit,
+   * `scrollTop` ne bouge pas, et le dernier message sort de la vue alors que
+   * l'utilisateur n'a rien fait. S'il lisait l'historique, en revanche, on ne
+   * touche à rien : son défilement lui appartient.
+   */
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    if (!stickToBottomRef.current) return;
+    el.scrollTop = el.scrollHeight;
+  }, [listSize.height, listRef]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,10 +123,7 @@ export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
   // deux panneaux doivent se comporter pareil. En desktop le panneau est dans
   // le flux (`sm:static`) et `top` est ignoré.
   return (
-    <aside
-      style={{ top: headerHeight }}
-      className="fixed inset-x-0 bottom-16 z-40 flex h-auto w-full flex-col bg-[#0f0f0f] sm:static sm:bottom-auto sm:z-auto sm:h-full sm:w-80"
-    >
+    <aside className="flex h-full w-full flex-col overflow-hidden bg-[#0f0f0f] sm:w-80">
       {/* Header */}
       <div className="flex h-[52px] flex-shrink-0 items-center justify-between border-b border-white/5 px-4">
         <h2 className="text-sm font-semibold text-white">Messages</h2>
@@ -82,8 +137,13 @@ export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
         </button>
       </div>
 
-      {/* Messages */}
-      <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-4">
+      {/* Messages.
+
+          La liste est enveloppée dans un repère qui, lui, NE défile pas :
+          c'est ce qui permet au bouton « revenir au dernier message » de
+          rester posé au-dessus de la liste au lieu de défiler avec elle. */}
+      <div className="relative min-h-0 flex-1">
+        <div ref={listRef} onScroll={handleScroll} className="h-full overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white/5">
@@ -110,8 +170,7 @@ export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
               {group.messages.map((msg) => {
                 const isMe = msg.from?.identity === localIdentity;
                 const name = msg.from?.name || msg.from?.identity || "Anonyme";
-                const initials = name.trim().slice(0, 1).toUpperCase() || "?";
-                const color = getAvatarColor(msg.from?.identity || "anon");
+                const senderIdentity = msg.from?.identity || "anon";
                 const time = new Date(msg.timestamp).toLocaleTimeString("fr-FR", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -122,12 +181,11 @@ export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
                     key={msg.id}
                     className={`flex gap-2.5 ${isMe ? "flex-row-reverse" : "flex-row"}`}
                   >
-                    <div
-                      className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-black"
-                      style={{ backgroundColor: color }}
-                    >
-                      {initials}
-                    </div>
+                    <ChatAvatar
+                      identity={senderIdentity}
+                      name={msg.from?.name}
+                      metadata={metadataByIdentity.get(senderIdentity)}
+                    />
 
                     <div
                       className={`flex max-w-[78%] flex-col ${isMe ? "items-end" : "items-start"}`}
@@ -140,7 +198,7 @@ export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
                       </div>
 
                       <div
-                        className={`mt-0.5 px-3 py-2 text-[13px] leading-relaxed ${
+                        className={`mt-0.5 px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap break-words ${
                           isMe
                             ? "rounded-2xl rounded-tr-sm bg-[#174ea6] text-white"
                             : "rounded-2xl rounded-tl-sm border border-white/5 bg-[#1a1a1a] text-white/90"
@@ -155,6 +213,23 @@ export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
             </div>
           </div>
         ))}
+
+        {/* Revenir au dernier message — n'apparaît que si l'utilisateur a
+            remonté l'historique. C'est le pendant du défilement automatique :
+            on ne lui vole jamais son défilement, mais on lui rend le retour
+            possible en un geste. */}
+        {!atBottom && messages.length > 0 && (
+          <button
+            type="button"
+            onClick={scrollToLatest}
+            aria-label="Revenir aux derniers messages"
+            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#2a2a2a] px-3 py-1.5 text-[11px] font-medium text-white shadow-lg ring-1 ring-white/10 transition-colors hover:bg-[#333]"
+          >
+            <ArrowDown size={13} />
+            Derniers messages
+          </button>
+        )}
+        </div>
       </div>
 
       {/* Input */}
@@ -188,6 +263,49 @@ export function ChatPanel({ roomId, onClose, headerHeight }: ChatPanelProps) {
 /* ═══════════════════════════════════════════════════════════════
    Helpers
    ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Avatar d'un message.
+ *
+ * Composant à part, et non un simple bloc dans la boucle d'affichage : il lui
+ * faut un état local pour retenir la photo dont le chargement a échoué, et un
+ * hook ne peut pas être appelé à l'intérieur d'un `.map()`.
+ */
+function ChatAvatar({
+  identity,
+  name,
+  metadata,
+}: {
+  identity: string;
+  name?: string;
+  metadata?: string;
+}) {
+  const avatar = resolveAvatar({ identity, name, metadata });
+  const [brokenPhotoUrl, setBrokenPhotoUrl] = useState<string | null>(null);
+  const photoUrl =
+    avatar.photoUrl && avatar.photoUrl !== brokenPhotoUrl ? avatar.photoUrl : null;
+
+  return (
+    <div
+      className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-bold text-black"
+      style={{ backgroundColor: avatar.color }}
+    >
+      {photoUrl ? (
+        <img
+          src={photoUrl}
+          alt=""
+          onError={() => setBrokenPhotoUrl(photoUrl)}
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        avatar.initials
+      )}
+    </div>
+  );
+}
 
 function groupByDate(messages: Array<any>) {
   const groups: { label: string; messages: typeof messages }[] = [];
