@@ -234,7 +234,18 @@ export const ParticipantTile = memo(function ParticipantTile({
         />
       )}
 
-      {anchorRect && onTogglePin && (
+      {/* Le menu est conditionné à `showPinButton`, et pas seulement à
+          `anchorRect`.
+
+          Sans cette garde, il restait un chemin par lequel l'épinglage
+          survivait sur mobile : ouvrir le menu, PUIS passer en mobile —
+          rotation du téléphone, réduction de la fenêtre, bascule
+          tactile. Le bouton disparaissait bien, mais le menu, lui, restait
+          rendu dans son portail : « Pour moi uniquement » et « Pour tous les
+          participants » flottaient au-dessus de la vidéo, sans plus aucun
+          moyen de les refermer. La condition d'affichage du menu doit être
+          au moins aussi stricte que celle du bouton qui l'ouvre. */}
+      {showPinButton && anchorRect && onTogglePin && (
         <PinMenu
           anchorRect={anchorRect}
           onClose={closeMenu}

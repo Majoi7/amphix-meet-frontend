@@ -1,7 +1,6 @@
 import type { CreateRoomResponse, TokenResponse } from "../types";
 import { getAccessToken } from "./tokenStore";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+import { API_BASE_URL } from "./apiBase";
 
 class ApiClientError extends Error {
   constructor(message: string) {
@@ -16,7 +15,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   // /api/token migreront sous /api/v1 avec requireAuth, rien à changer ici.
   const token = getAccessToken();
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

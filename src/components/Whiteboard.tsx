@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Check,
-  ChevronDown,
+  ArrowLeft,
   Circle as CircleIcon,
   Eraser,
   Eye,
@@ -17,7 +16,6 @@ import {
   Square,
   Trash2,
   Undo2,
-  X,
 } from "lucide-react";
 import { useDataChannel, useLocalParticipant } from "@livekit/components-react";
 import { getWhiteboard, saveWhiteboard } from "../lib/whiteboardApi";
@@ -28,18 +26,6 @@ import {
   hitTestStroke,
   strokeTouchTolerance,
 } from "../lib/whiteboardHitTest";
-import {
-  DEFAULT_BACKGROUND_ID,
-  SHEET_HEIGHT,
-  SHEET_MIN_X,
-  SHEET_MIN_Y,
-  SHEET_WIDTH,
-  WHITEBOARD_BACKGROUNDS,
-  getBackground,
-  getReadyBackgroundImage,
-  subscribeBackgroundImages,
-  type WhiteboardBackgroundDefinition,
-} from "../lib/whiteboardBackgrounds";
 import { MathPanel } from "./MathPanel";
 import type {
   WhiteboardCamera,
@@ -70,8 +56,7 @@ type WhiteboardMessage =
   | { type: "stroke"; stroke: WhiteboardStroke }
   | { type: "update"; stroke: WhiteboardStroke }
   | { type: "remove"; strokeId: string }
-  | { type: "clear" }
-  | { type: "background"; backgroundId: string };
+  | { type: "clear" };
 
 function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
@@ -128,10 +113,6 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
   const { localParticipant } = useLocalParticipant();
 
   const [strokes, setStrokes] = useState<WhiteboardStroke[]>([]);
-  // Fond de la feuille — état SÉPARÉ des traits : il n'entre ni dans
-  // l'historique undo/redo, ni dans la sélection, ni dans la gomme.
-  const [backgroundId, setBackgroundId] = useState<string>(DEFAULT_BACKGROUND_ID);
-  const [isBackgroundMenuOpen, setIsBackgroundMenuOpen] = useState(false);
   // Passe à vrai quand le GET initial a abouti (ou échoué) : tant qu'il est
   // faux, on ne sauvegarde rien.
   const [isLoaded, setIsLoaded] = useState(false);
@@ -284,11 +265,11 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
         setStrokes((prev) => prev.filter((s) => s.id !== payload.strokeId));
       } else if (payload.type === "clear") {
         setStrokes([]);
-      } else if (payload.type === "background") {
-        // Idempotent : `getBackground` ramène un identifiant inconnu au fond
-        // par défaut, et React ne re-rend pas si la valeur est identique.
-        setBackgroundId(getBackground(payload.backgroundId).id);
       }
+      // Un message `background` venu d'un client plus ancien n'est plus
+      // reconnu : il tombe simplement dans le cas par défaut. Le fond du
+      // tableau n'est plus une donnée — il est blanc, toujours. Aucun message
+      // malformé ou inconnu ne doit interrompre le dessin.
     } catch {
       /* message malformé — ignoré */
     }
@@ -316,12 +297,9 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
             ? { ...s, points: s.points.map((p) => ({ x: p.x * WHITEBOARD_LEGACY_WIDTH, y: p.y * WHITEBOARD_LEGACY_HEIGHT })) }
             : s
         );
-        const loadedBackground = getBackground(data.background).id;
-
         if (!syncTouchedRef.current) {
           // Rien n'est arrivé entre-temps : l'état serveur fait référence.
           setStrokes(loaded);
-          setBackgroundId(loadedBackground);
           setIsLoaded(true);
           return;
         }
@@ -335,8 +313,6 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
           const missing = loaded.filter((s) => !known.has(s.id));
           return missing.length > 0 ? [...missing, ...prev] : prev;
         });
-        // Le fond ne se fusionne pas : un seul est actif. Celui qu'a apporté le
-        // canal est le plus récent, on n'y touche donc pas.
         setIsLoaded(true);
       })
       .catch(() => {
@@ -363,11 +339,10 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
 
   useEffect(() => {
     // Jamais avant la fin du chargement initial : sinon un client lent
-    // enverrait un tableau vide (et le fond par défaut) et effacerait le
-    // travail des autres.
+    // enverrait un tableau vide et effacerait le travail des autres.
     if (!isLoaded) return;
-    scheduleSave({ version: 2, strokes, background: backgroundId });
-  }, [isLoaded, strokes, backgroundId, scheduleSave]);
+    scheduleSave({ version: 2, strokes });
+  }, [isLoaded, strokes, scheduleSave]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -376,33 +351,23 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
     if (!ctx) return;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const background = getBackground(backgroundId);
+    // FOND BLANC PUR, peint en espace écran — la seule couche de fond.
+    //
+    // `clearRect` laissait des pixels TRANSPARENTS : ce qui apparaissait
+    // « derrière » le tableau n'était pas un fond du tableau mais celui de
+    // ses parents (`Room`, `VideoGrid`), et il changeait donc avec eux. On
+    // remplit explicitement : le tableau ne dépend plus de ce qui l'entoure.
+    //
+    // C'est aussi ce que capture `captureStream` lors d'un partage d'écran —
+    // un fond transparent y serait rendu noir.
+    //
+    // Il n'y a plus ni feuille, ni grille de cahier, ni image de fond, ni
+    // liseré : le tableau est blanc, et rien d'autre.
+    ctx.fillStyle = CANVAS_BG;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 1) La feuille (fond) — couche la plus basse, dans le repère monde.
-    ctx.setTransform(camera.zoom, 0, 0, camera.zoom, -camera.x * camera.zoom, -camera.y * camera.zoom);
-    drawSheet(ctx, background);
-
-    // 2) Grille de cahier éventuelle. Tracée en espace écran comme avant, mais
-    //    DÉCOUPÉE à la feuille : sans cela elle déborderait sur le vide autour
-    //    et salirait une illustration.
-    if (background.grid) {
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(
-        (SHEET_MIN_X - camera.x) * camera.zoom,
-        (SHEET_MIN_Y - camera.y) * camera.zoom,
-        SHEET_WIDTH * camera.zoom,
-        SHEET_HEIGHT * camera.zoom
-      );
-      ctx.clip();
-      drawNotebookLines(ctx, camera, canvas.width, canvas.height);
-      ctx.restore();
-    }
-
-    // 3) Les traits — le repère monde est reposé.
+    // Les traits — repère monde.
     ctx.setTransform(camera.zoom, 0, 0, camera.zoom, -camera.x * camera.zoom, -camera.y * camera.zoom);
 
     const dragOffset = moveDragRef.current?.offset;
@@ -452,15 +417,11 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
       ctx.strokeRect(x, y, w, h);
       ctx.restore();
     }
-  }, [strokes, camera, selectedIds, backgroundId]);
+  }, [strokes, camera, selectedIds]);
 
   useEffect(() => {
     draw();
   });
-
-  // Une image de fond qui finit de se décoder doit déclencher UN redessin.
-  // Le cache du registre garantit qu'aucune `Image()` n'est recréée ensuite.
-  useEffect(() => subscribeBackgroundImages(() => forceRender((n) => n + 1)), []);
 
   // Redimensionnement du canvas au conteneur (sans réinitialiser la caméra).
   useEffect(() => {
@@ -821,26 +782,6 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
     setCamera(DEFAULT_CAMERA);
   }
 
-  /**
-   * Change le fond de la feuille.
-   *
-   * Appliqué localement, diffusé par le canal existant, puis persisté par le
-   * `scheduleSave` déjà en place — aucun nouveau protocole, aucune route.
-   *
-   * Volontairement HORS de tout updater `setState` : en mode strict React
-   * exécute les updaters deux fois, ce qui enverrait le message en double.
-   * Le fond ne touche ni `strokes`, ni `selectedIds`, ni les piles
-   * d'historique : Ctrl+Z ne peut donc pas l'annuler et la gomme l'ignore.
-   */
-  function handleSelectBackground(id: string) {
-    // Un identifiant inconnu retombe sur le fond par défaut (idempotence).
-    const resolved = getBackground(id).id;
-    syncTouchedRef.current = true;
-    setBackgroundId(resolved);
-    setIsBackgroundMenuOpen(false);
-    broadcast({ type: "background", backgroundId: resolved });
-  }
-
   /** Recadre les traits produits par MathPanel (sa propre convention 0..1)
    * dans le rectangle actuellement visible de la caméra courante. */
   function handleMathPlot(mathStrokes: WhiteboardStroke[]) {
@@ -924,16 +865,6 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
 
           <div className="mx-1 h-6 w-px bg-meet-border" />
 
-          <BackgroundControl
-            activeId={backgroundId}
-            isOpen={isBackgroundMenuOpen}
-            onToggle={() => setIsBackgroundMenuOpen((v) => !v)}
-            onSelect={handleSelectBackground}
-            onClose={() => setIsBackgroundMenuOpen(false)}
-          />
-
-          <div className="mx-1 h-6 w-px bg-meet-border" />
-
           <ToolButton onClick={handleUndo} label="Annuler mon dernier trait">
             <Undo2 size={16} />
           </ToolButton>
@@ -983,26 +914,52 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
             <EyeOff size={16} />
           </ToolButton>
 
+          {/* L'UNIQUE bouton de sortie du tableau blanc.
+
+              Son action ne touche QUE l'état d'interface du parent : le
+              tableau se referme, `MeetControls`, l'en-tête et la grille
+              vidéo réapparaissent. La connexion LiveKit n'est jamais
+              touchée — ni reconnexion, ni nouvelle publication de caméra ou
+              de micro, ni rechargement de page. Le participant n'a jamais
+              quitté la réunion : c'est un changement de mode, pas un départ.
+
+              Il est poussé à droite (`ml-auto`) pour être à la fois le
+              dernier élément de la barre et le seul bouton de sortie. */}
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fermer le tableau blanc"
-            className="ml-auto flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-meet-text-secondary hover:bg-meet-control hover:text-meet-text-primary"
+            className="ml-auto flex h-8 flex-shrink-0 items-center gap-1.5 rounded-full bg-meet-control px-3 text-xs font-medium text-meet-text-primary transition-colors hover:bg-meet-border"
           >
-            <X size={18} />
+            <ArrowLeft size={15} />
+            Retour au Meet
           </button>
         </div>
       )}
 
+      {/* En mode zen la barre d'outils est masquée — y compris le bouton de
+          sortie. Le mode zen ne doit pourtant pas enfermer l'utilisateur : on
+          remet donc les DEUX seules commandes qui restent indispensables,
+          sans la barre. Le bouton « Retour au Meet » n'est jamais rendu deux
+          fois en même temps : celui de la barre a disparu avec elle. */}
       {isZen && (
-        <button
-          type="button"
-          onClick={() => setIsZen(false)}
-          aria-label="Quitter le mode zen"
-          className="absolute left-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white/70 backdrop-blur transition-colors hover:bg-black/60 hover:text-white"
-        >
-          <Eye size={16} />
-        </button>
+        <div className="absolute inset-x-3 top-3 z-20 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setIsZen(false)}
+            aria-label="Quitter le mode zen"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-black/80"
+          >
+            <Eye size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 items-center gap-1.5 rounded-full bg-black/60 px-3.5 text-xs font-medium text-white backdrop-blur transition-colors hover:bg-black/80"
+          >
+            <ArrowLeft size={15} />
+            Retour au Meet
+          </button>
+        </div>
       )}
 
       <div ref={containerRef} className="relative min-h-0 flex-1">
@@ -1029,72 +986,13 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
   );
 }
 
-/**
- * Dessine la feuille — la couche LA PLUS BASSE, sous la grille et sous les
- * traits. Elle vit dans le repère monde : elle suit donc exactement le zoom,
- * le pan et le recentrage, et se retrouve telle quelle dans le canvas capturé
- * par le partage d'écran (le fond n'est PAS un `background-image` CSS, qui
- * aurait été ignoré par `captureStream`).
- *
- * Rien ici ne touche à `strokes` : changer de fond ne peut ni modifier un
- * dessin, ni entrer dans l'historique, ni réveiller la gomme.
- */
-function drawSheet(
-  ctx: CanvasRenderingContext2D,
-  background: WhiteboardBackgroundDefinition
-): void {
-  if (background.kind === "color") {
-    ctx.fillStyle = background.value;
-    ctx.fillRect(SHEET_MIN_X, SHEET_MIN_Y, SHEET_WIDTH, SHEET_HEIGHT);
-    return;
-  }
+/* ═══════════════════════════════════════════════════════════════
+   Rendu des traits
 
-  const image = getReadyBackgroundImage(background);
-  if (image) {
-    // La feuille est en 16:9 et les visuels sont proches de ce rapport :
-    // l'étirement résiduel est négligeable, et il vaut mieux cela qu'une bande
-    // vide sur un bord.
-    ctx.drawImage(image, SHEET_MIN_X, SHEET_MIN_Y, SHEET_WIDTH, SHEET_HEIGHT);
-  } else {
-    // Image pas encore décodée : on peint la couleur de repli pour que le
-    // premier rendu ne soit pas un trou, et `subscribeBackgroundImages`
-    // déclenchera le redessin dès que l'image est prête.
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(SHEET_MIN_X, SHEET_MIN_Y, SHEET_WIDTH, SHEET_HEIGHT);
-  }
-
-  // Liseré discret : la feuille se détache du vide qui l'entoure.
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.12)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(SHEET_MIN_X, SHEET_MIN_Y, SHEET_WIDTH, SHEET_HEIGHT);
-}
-
-function drawNotebookLines(ctx: CanvasRenderingContext2D, camera: WhiteboardCamera, width: number, height: number): void {
-  // Only draw lines if zoomed out enough to see them (avoid too many lines when zoomed in)
-  if (camera.zoom < 0.05) return;
-
-  ctx.save();
-
-  // Set line style - light gray for notebook lines
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.1)";
-  ctx.lineWidth = 0.5 / camera.zoom; // Scale line width with zoom
-
-  // Starting point for lines (aligned to grid)
-  const startY = Math.floor(camera.y / 1) * 1; // 1 unit spacing
-
-  // Draw horizontal lines (notebook style)
-  for (let y = startY; y <= startY + height / camera.zoom; y += 1) {
-    const screenY = (y - camera.y) * camera.zoom;
-    if (screenY >= 0 && screenY <= height) {
-      ctx.beginPath();
-      ctx.moveTo(0, screenY);
-      ctx.lineTo(width, screenY);
-      ctx.stroke();
-    }
-  }
-
-  ctx.restore();
-}
+   Il n'y a plus de `drawSheet` ni de `drawNotebookLines` : le tableau n'a
+   plus de fond à dessiner. Il est blanc, peint une fois par `draw` en espace
+   écran, et rien ne vient s'intercaler entre ce blanc et les traits.
+   ═══════════════════════════════════════════════════════════════ */
 
 function drawStroke(ctx: CanvasRenderingContext2D, stroke: WhiteboardStroke): void {
   if (stroke.points.length === 0) return;
@@ -1135,137 +1033,13 @@ function drawStroke(ctx: CanvasRenderingContext2D, stroke: WhiteboardStroke): vo
   }
 }
 
-/** Aperçu d'un fond : aplat de couleur, ou miniature de l'image. */
-function BackgroundThumbnail({
-  definition,
-  className = "h-8 w-14",
-}: {
-  definition: WhiteboardBackgroundDefinition;
-  className?: string;
-}) {
-  return (
-    <span
-      className={`shrink-0 overflow-hidden rounded-md ring-1 ring-black/15 ${className}`}
-      style={definition.kind === "color" ? { backgroundColor: definition.value } : undefined}
-    >
-      {definition.kind === "image" && (
-        <img
-          src={definition.value}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover"
-        />
-      )}
-    </span>
-  );
-}
+/* ═══════════════════════════════════════════════════════════════
+   Bouton d'outil
 
-/**
- * Commande de fond : un bouton dans la barre d'outils, plus un menu.
- *
- * Le menu est ancré à la BARRE et non au bouton : sur mobile la barre se replie
- * sur plusieurs lignes, et un menu accroché au bouton sortirait de l'écran
- * selon la ligne où il atterrit. `max-w-[calc(100vw-1rem)]` garantit qu'il ne
- * déborde jamais horizontalement.
- *
- * La liste des fonds vient entièrement du registre — rien n'est décrit ici.
- */
-function BackgroundControl({
-  activeId,
-  isOpen,
-  onToggle,
-  onSelect,
-  onClose,
-}: {
-  activeId: string;
-  isOpen: boolean;
-  onToggle: () => void;
-  onSelect: (id: string) => void;
-  onClose: () => void;
-}) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const active = getBackground(activeId);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    function handlePointerDown(e: PointerEvent) {
-      const target = e.target as Element | null;
-      if (menuRef.current && target && menuRef.current.contains(target)) return;
-      // Le bouton d'ouverture gère lui-même la bascule : fermer ici aussi
-      // fermerait puis rouvrirait dans la même interaction.
-      if (target && target.closest("[data-background-toggle]")) return;
-      onClose();
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
-
-  return (
-    <>
-      <button
-        type="button"
-        data-background-toggle
-        onClick={onToggle}
-        aria-label={`Fond du tableau — ${active.label}`}
-        aria-expanded={isOpen}
-        title="Fond du tableau"
-        className={`flex h-8 flex-shrink-0 items-center gap-1 rounded-full px-1.5 transition-colors ${
-          isOpen
-            ? "bg-meet-blue text-meet-bg"
-            : "text-meet-text-secondary hover:bg-meet-control hover:text-meet-text-primary"
-        }`}
-      >
-        <BackgroundThumbnail definition={active} className="h-5 w-9" />
-        <ChevronDown size={13} aria-hidden="true" />
-      </button>
-
-      {isOpen && (
-        <div
-          ref={menuRef}
-          role="group"
-          aria-label="Choix du fond du tableau"
-          className="absolute right-2 top-full z-30 mt-1 w-64 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-meet-border bg-meet-bg-secondary p-1.5 shadow-2xl"
-        >
-          <p className="px-2 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-meet-text-secondary">
-            Fond du tableau
-          </p>
-          {WHITEBOARD_BACKGROUNDS.map((definition) => {
-            const isActive = definition.id === activeId;
-            return (
-              <button
-                key={definition.id}
-                type="button"
-                aria-pressed={isActive}
-                onClick={() => onSelect(definition.id)}
-                className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${
-                  isActive ? "bg-meet-control" : "hover:bg-meet-control"
-                }`}
-              >
-                <BackgroundThumbnail definition={definition} />
-                <span className="min-w-0 flex-1 truncate text-[13px] text-meet-text-primary">
-                  {definition.label}
-                </span>
-                {isActive && (
-                  <Check size={15} className="shrink-0 text-meet-blue" aria-hidden="true" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </>
-  );
-}
+   Les composants `BackgroundThumbnail` et `BackgroundControl` ont été
+   retirés : le tableau n'a plus qu'un fond possible, le blanc. Un sélecteur
+   de fond n'a donc plus rien à sélectionner.
+   ═══════════════════════════════════════════════════════════════ */
 
 function ToolButton({
   children,

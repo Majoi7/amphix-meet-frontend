@@ -32,6 +32,7 @@ import { useLobbyRequests } from "../hooks/useLobbyRequests";
 import { useHandRaise } from "../hooks/useHandRaise";
 import { useReactions } from "../hooks/useReactions";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { useViewportSize } from "../hooks/useViewportSize";
 import { playSound, SOUND_HAND_RAISE, SOUND_SORTIE } from "../lib/sounds";
 import type { DevicePreferences } from "../types";
 
@@ -84,6 +85,13 @@ interface ConnectionInfo {
 export function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  // Source de vérité UNIQUE de la hauteur de la surface, montée au sommet de
+  // la page : elle couvre l'avant-réunion comme la réunion elle-même, et
+  // c'est elle qui garantit que la boîte change VRAIMENT de taille à la
+  // rotation — sans quoi le `ResizeObserver` du moteur de layout n'a rien à
+  // observer et la surface de partage garde les dimensions de l'ancienne
+  // orientation. Aucun autre composant n'écoute le redimensionnement.
+  useViewportSize();
   const [connection, setConnection] = useState<ConnectionInfo | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -463,15 +471,27 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
       {/* La bannière de connexion est rendue une seule fois, dans `RoomPage` :
           la dupliquer ici superposait deux bannières `fixed` identiques. */}
 
-      {/* Chrome de réunion flottant, posé par-dessus la vidéo */}
-      <RoomHeader
-        roomId={roomId}
-        endsAt={endsAt}
-        participantCount={participants.length}
-        onOpenParticipants={() => togglePanel("participants")}
-        isParticipantsOpen={panel === "participants"}
-        onHeightChange={handleHeaderHeight}
-      />
+      {/* Le chrome de réunion n'existe PAS en mode Whiteboard.
+
+          Le Whiteboard est un MODE DÉDIÉ, pas une surcouche : en-tête, barre
+          de contrôle, panneaux et notifications de réunion ne sont pas
+          masqués par du `z-index`, ils ne sont tout simplement pas rendus.
+          Rien ne peut donc dépasser du tableau, et aucun de leurs écouteurs
+          ne tourne pendant qu'on dessine.
+
+          L'état `isWhiteboardOpen` est déjà la seule source de vérité pour
+          savoir dans quel mode on se trouve : les conditions ci-dessous la
+          lisent toutes, elles ne peuvent pas diverger. */}
+      {!isWhiteboardOpen && (
+        <RoomHeader
+          roomId={roomId}
+          endsAt={endsAt}
+          participantCount={participants.length}
+          onOpenParticipants={() => togglePanel("participants")}
+          isParticipantsOpen={panel === "participants"}
+          onHeightChange={handleHeaderHeight}
+        />
+      )}
 
       {/* Le `paddingTop` mesure la hauteur réelle du header : la zone vidéo ET
           les panneaux latéraux commencent donc exactement sous lui. Auparavant
@@ -486,13 +506,27 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
           barre. */}
       <div
         className="flex min-h-0 flex-1 overflow-hidden"
-        style={{ paddingTop: headerHeight, paddingBottom: controlBarHeight }}
+        style={
+          // Aucune réserve en mode Whiteboard : ni en-tête ni barre de
+          // contrôle ne sont rendus, le tableau occupe donc TOUTE la surface.
+          // Les y laisser creuserait deux bandes de fond sombre en haut et en
+          // bas du tableau blanc.
+          isWhiteboardOpen
+            ? undefined
+            : { paddingTop: headerHeight, paddingBottom: controlBarHeight }
+        }
       >
         <main
-          className="relative min-w-0 flex-1 overflow-hidden"
+          // `bg-white` en mode Whiteboard : le tableau peint déjà son fond,
+          // mais on garantit ici qu'AUCUN fond sombre de la réunion ne peut
+          // apparaître derrière lui — fût-ce sur une fraction de pixel ou
+          // pendant la frame qui suit la fermeture d'un panneau.
+          className={`relative min-w-0 flex-1 overflow-hidden ${
+            isWhiteboardOpen ? "bg-white" : ""
+          }`}
           onClick={!isWhiteboardOpen ? handleScreenTap : undefined}
         >
- {isWhiteboardOpen ? (
+          {isWhiteboardOpen ? (
             <Whiteboard
               roomId={roomId}
               isHost={isHost}
@@ -503,7 +537,7 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
           )}
         </main>
 
-        {panel === "participants" && !isMobile && (
+        {!isWhiteboardOpen && panel === "participants" && !isMobile && (
           <aside className="h-full w-80 shrink-0 overflow-y-auto border-l border-white/10 bg-meet-bg">
             <ParticipantsPanel
               onClose={() => setPanel("none")}
@@ -514,7 +548,7 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
             />
           </aside>
         )}
-        {panel === "chat" && !isMobile && (
+        {!isWhiteboardOpen && panel === "chat" && !isMobile && (
           <aside className="h-full w-80 shrink-0 overflow-y-auto border-l border-white/10 bg-meet-bg">
             <ChatPanel roomId={roomId} onClose={() => setPanel("none")} />
           </aside>
@@ -535,7 +569,7 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
           accessible : la barre mobile mesure 96 px, alors que le panneau
           s'arrêtait auparavant à `bottom-16` (64 px) et disparaissait donc
           DERRIÈRE elle sur 32 px. */}
-      {isMobile && panel !== "none" && (
+      {!isWhiteboardOpen && isMobile && panel !== "none" && (
         <div
           className="fixed inset-x-0 z-40 bg-meet-bg"
           style={{ top: headerHeight, bottom: controlBarHeight }}
@@ -555,14 +589,14 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
         </div>
       )}
 
-      <ReactionOverlay reactions={reactions} />
+      {!isWhiteboardOpen && <ReactionOverlay reactions={reactions} />}
 
       {/* Indicateur mains levées — placé SOUS le chrome de réunion (h-14)
           pour ne jamais recouvrir le compteur, l'horloge ou le bouton
           d'invitation. La pastille est bornée à la largeur de l'écran et la
           liste des noms se tronque : avec dix mains levées, elle débordait
           horizontalement sur mobile. */}
-      {raisedHands.size > 0 && (
+      {!isWhiteboardOpen && raisedHands.size > 0 && (
         <div className="pointer-events-none absolute inset-x-3 top-16 z-20 flex justify-end animate-[slide-up_0.2s_ease-out]">
           <div className="flex min-w-0 max-w-full items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-xs text-white shadow-lg backdrop-blur-md ring-1 ring-white/10">
             <Hand size={14} className="flex-shrink-0 text-yellow-400" />
@@ -576,45 +610,61 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
         </div>
       )}
 
-      {/* Notifications chat flottantes */}
-      <ChatNotification />
+      {/* Notifications chat flottantes.
+          Masquées en mode Whiteboard, comme le reste du chrome de réunion :
+          une bulle de message posée sur le tableau n'aurait aucun sens et
+          masquerait la zone de dessin. */}
+      {!isWhiteboardOpen && <ChatNotification />}
 
       {/* Hand raise notifications (turtle) */}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col-reverse space-y-3">
-        {handRaiseNotifications.map((notification) => (
-          <HandRaiseNotification
-            key={notification.id}
-            id={notification.id}
-            name={notification.name}
-            onRemove={removeNotification}
-          />
-        ))}
-      </div>
+      {!isWhiteboardOpen && (
+        <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col-reverse space-y-3">
+          {handRaiseNotifications.map((notification) => (
+            <HandRaiseNotification
+              key={notification.id}
+              id={notification.id}
+              name={notification.name}
+              onRemove={removeNotification}
+            />
+          ))}
+        </div>
+      )}
 
-      <MeetControls
-        roomId={roomId}
-        meetingStartTime={meetingStartTime}
-        isChatOpen={panel === "chat"}
-        isParticipantsOpen={panel === "participants"}
-        isWhiteboardOpen={isWhiteboardOpen}
-        isHandRaised={isHandRaised}
-        raisedHandsCount={raisedHands.size}
-        unreadChatCount={unreadChatCount}
-        participantCount={participants.length}
-        pendingLobbyCount={lobbyRequests.length}
-        isHost={isHost}
-        onToggleChat={() => togglePanel("chat")}
-        onToggleParticipants={() => togglePanel("participants")}
-        onToggleWhiteboard={() => setIsWhiteboardOpen((v) => !v)}
-        onToggleHand={handleToggleHand}
-        onSendReaction={sendReaction}
-        onLeave={handleLeave}
-        onEndMeeting={handleEndMeeting}
-        isMoreOpen={moreOpen}
-        onToggleMore={toggleMore}
-        controlsVisible={controlsVisible}
-        onBarHeightChange={handleControlBarHeight}
-      />
+      {/* La barre de contrôle n'est pas rendue du tout en mode Whiteboard :
+          caméra, micro, partage d'écran, réactions, participants, chat et
+          bouton de sortie de réunion disparaissent ensemble. C'est la
+          condition d'affichage — et non un `z-index` — qui l'obtient : plus
+          aucun de ses écouteurs ne tourne pendant qu'on dessine, et son
+          `ResizeObserver` ne peut pas remonter une hauteur fantôme.
+
+          Le retour au Meet se fait par l'unique bouton « Retour au Meet » du
+          Whiteboard lui-même (voir `Whiteboard.tsx`). */}
+      {!isWhiteboardOpen && (
+        <MeetControls
+          roomId={roomId}
+          meetingStartTime={meetingStartTime}
+          isChatOpen={panel === "chat"}
+          isParticipantsOpen={panel === "participants"}
+          isWhiteboardOpen={isWhiteboardOpen}
+          isHandRaised={isHandRaised}
+          raisedHandsCount={raisedHands.size}
+          unreadChatCount={unreadChatCount}
+          participantCount={participants.length}
+          pendingLobbyCount={lobbyRequests.length}
+          isHost={isHost}
+          onToggleChat={() => togglePanel("chat")}
+          onToggleParticipants={() => togglePanel("participants")}
+          onToggleWhiteboard={() => setIsWhiteboardOpen((v) => !v)}
+          onToggleHand={handleToggleHand}
+          onSendReaction={sendReaction}
+          onLeave={handleLeave}
+          onEndMeeting={handleEndMeeting}
+          isMoreOpen={moreOpen}
+          onToggleMore={toggleMore}
+          controlsVisible={controlsVisible}
+          onBarHeightChange={handleControlBarHeight}
+        />
+      )}
     </div>
   );
 }

@@ -289,6 +289,11 @@ export function VideoGrid({ roomId, isHost }: { roomId?: string; isHost?: boolea
           // supprimer toute action tactile d'épinglage. Le bouton est en
           // position absolue, il ne réservait de toute façon aucune place.
           //
+          // `isMobile` vaut vrai aussi pour un téléphone en PAYSAGE depuis que
+          // `useIsMobile` tient compte du tactile : auparavant, un 844 × 390
+          // repassait au-dessus du seuil de 640 px et faisait réapparaître
+          // l'épingle au moment même de la rotation.
+          //
           // Le système d'épingle lui-même reste entier (`togglePin`,
           // `requestGlobalPin`, `useGlobalPin`) : il continue de fonctionner
           // sur desktop, et la vignette locale y reste épinglable comme

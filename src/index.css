@@ -12,26 +12,31 @@
   /*
     Surface de l'application de réunion.
 
-    `vh` d'abord, `dvh` ensuite : deux déclarations de la même propriété, la
-    seconde ignorée sans risque par un navigateur qui ne connaît pas `dvh` —
-    c'est la convention déjà retenue dans `mathspace.css`, on la reprend.
+    Trois déclarations de la même propriété, du plus ancien au plus récent —
+    un navigateur ignore sans risque celles qu'il ne connaît pas :
 
-    Pourquoi pas `h-screen` (100vh) : sur iOS et Android, `100vh` vaut la
-    PLUS GRANDE hauteur possible, barre d'URL masquée. Deux conséquences
-    constatées :
+      1. `100vh`  : le repli universel.
+      2. `100dvh` : la surface réellement visible, recalculée à la rotation
+                    comme à l'ouverture du clavier. Ignorée par iOS < 15.4 et
+                    Chrome < 108.
+      3. `var(--app-height, 100dvh)` : LA valeur qui compte, écrite sur
+                    `:root` par `useViewportSize`.
 
-      - la barre de contrôle passait SOUS le chrome du navigateur ;
-      - surtout, la valeur n'était pas recalculée à la rotation. Le moteur de
-        layout, qui mesure la taille réelle de la zone vidéo, gardait donc les
-        dimensions de l'ANCIENNE orientation : un partage d'écran restait
-        dimensionné pour le portrait après passage en paysage.
+    Pourquoi la troisième, alors que `dvh` existe : sur un navigateur qui ne
+    connaît pas `dvh`, c'est `100vh` qui s'applique — or `100vh` vaut la PLUS
+    GRANDE hauteur possible et n'est PAS recalculé à la rotation. La boîte ne
+    changeait donc pas de taille, le `ResizeObserver` du moteur de layout
+    n'avait rien à observer, et un partage d'écran restait dimensionné pour
+    l'ancienne orientation. `dvh` seul ne suffisait pas : il faut que la
+    hauteur change réellement pour que la mesure suive.
 
-    `dvh` décrit la surface réellement visible et se recalcule à la rotation
-    comme à l'ouverture du clavier : la mesure reprend le dessus d'elle-même.
+    Le repli `100dvh` de `var()` couvre le premier rendu, avant que le hook
+    n'ait écrit la variable.
   */
   .app-viewport {
     height: 100vh;
     height: 100dvh;
+    height: var(--app-height, 100dvh);
   }
 
   body {

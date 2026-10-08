@@ -1,6 +1,5 @@
 import { getAccessToken, setAccessToken } from "./tokenStore";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+import { API_BASE_URL } from "./apiBase";
 
 export class ApiClientError extends Error {
   status: number;
@@ -12,7 +11,7 @@ export class ApiClientError extends Error {
 }
 
 export async function rawRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     credentials: "include", // requis pour le cookie httpOnly de refresh token
     ...options,
     headers: { "Content-Type": "application/json", ...options.headers },
