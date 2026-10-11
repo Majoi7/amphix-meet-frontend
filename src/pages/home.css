@@ -1,0 +1,912 @@
+.hm-root {
+    position: relative;
+    isolation: isolate;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    background: var(--app-bg);
+    color: var(--app-text);
+    font-family: Figtree, system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- Fond blanc pur (thème clair seulement) ----
+
+   Le brief demande #FFFFFF sur l'accueil. `--app-bg` vaut #f7f6ff dans
+   `theme.css` et sert AUSSI l'espace mathématique et l'administration : on ne
+   le touche donc pas là-bas, on le surcharge ici, à la racine de la page — et
+   seulement en clair, pour que le fond sombre (#0d0a2b) reste intact.
+
+   Conséquence à assumer : la page et les cartes deviennent toutes deux
+   blanches, puisque `.hm-item` lit `--app-surface` (#ffffff). La distinction
+   page ↔ carte ne tient donc plus qu'à la bordure et à l'ombre. Or
+   `--app-shadow` (0 1px 2px à 5 % d'alpha) était calibrée pour un fond
+   lavande : sur du blanc pur, elle disparaît. On la renforce ici — la seule
+   règle de ce fichier qui lit `--app-shadow` est `.hm-item`, et
+   `.hm-item-past` garde son `box-shadow: none` explicite, donc la carte
+   « passée » reste plate. Le thème sombre n'est pas concerné. */
+.hm-root:not([data-theme="dark"]) {
+    --app-bg: #ffffff;
+    --app-shadow: 0 1px 2px rgba(20, 16, 58, 0.04), 0 6px 16px -10px rgba(20, 16, 58, 0.16);
+}
+
+.hm-root *,
+.hm-root *::before,
+.hm-root *::after {
+    box-sizing: border-box;
+}
+
+.hm-root a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.hm-root h1,
+.hm-root h2,
+.hm-root h3 {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+
+.hm-root p {
+    margin: 0;
+}
+
+.hm-root ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.hm-glow {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(ellipse 900px 520px at 50% -120px, var(--app-glow), transparent 68%);
+}
+
+
+/* ---------- Header ---------- */
+
+.hm-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding-top: env(safe-area-inset-top, 0px);
+    background: color-mix(in srgb, var(--app-bg) 82%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--app-border);
+}
+
+.hm-header-in {
+    max-width: 1152px;
+    margin: 0 auto;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.hm-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hm-brand svg {
+    width: 36px;
+    height: 31px;
+    flex: none;
+}
+
+.hm-brand-name {
+    font: 800 20px "Bricolage Grotesque", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+}
+
+.hm-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hm-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 14px 0 6px;
+    border-radius: 999px;
+    border: 1.5px solid var(--app-border);
+    background: var(--app-surface);
+    font-size: 14px;
+    font-weight: 600;
+    transition: border-color .2s, background .2s, transform .2s;
+}
+
+.hm-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: none;
+}
+
+.hm-avatar-fb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    color: #14103a;
+}
+
+.hm-chip-name {
+    display: none;
+}
+
+.hm-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1.5px solid var(--app-border);
+    background: transparent;
+    color: var(--app-text-muted);
+    font: 600 13px Figtree, system-ui, sans-serif;
+    cursor: pointer;
+    transition: background .2s, color .2s, border-color .2s, transform .2s;
+}
+
+.hm-pill-label {
+    display: none;
+}
+
+.hm-logout {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1.5px solid var(--app-red);
+    background: var(--app-red-soft);
+    color: var(--app-red);
+    font: 600 13px Figtree, system-ui, sans-serif;
+    cursor: pointer;
+    transition: background .2s, color .2s, transform .2s;
+}
+
+
+/* ---------- Main ---------- */
+
+.hm-main {
+    width: 100%;
+    max-width: 1152px;
+    margin: 0 auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    padding: 24px 24px 110px;
+}
+
+.hm-col {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.hm-side {
+    width: 100%;
+    min-width: 0;
+}
+
+.hm-hello {
+    margin-bottom: 24px;
+}
+
+.hm-hello h2 {
+    font-size: clamp(32px, 5vw, 46px);
+    line-height: 1.06;
+    font-weight: 800;
+}
+
+.hm-hello-name {
+    background: linear-gradient(135deg, var(--app-btn-1), var(--app-accent-strong));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.hm-hello-sub {
+    margin-top: 10px;
+    font-size: 16px;
+    color: var(--app-text-muted);
+}
+
+.hm-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.hm-q {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1.5px solid var(--app-border);
+    background: var(--app-surface);
+    color: var(--app-text-muted);
+    font: 600 13px Figtree, system-ui, sans-serif;
+    cursor: pointer;
+    transition: background .2s, color .2s, border-color .2s, transform .2s;
+}
+
+.hm-q.on {
+    background: var(--app-accent-soft);
+    border-color: var(--app-accent);
+    color: var(--app-accent-strong);
+}
+
+.hm-actions {
+    display: grid;
+    gap: 12px;
+}
+
+.hm-btn-primary {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 60px;
+    padding: 0 24px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--app-btn-1), var(--app-btn-2));
+    color: var(--app-on-accent);
+    font: 700 16px "Bricolage Grotesque", system-ui, sans-serif;
+    cursor: pointer;
+    box-shadow: 0 14px 30px -14px var(--app-accent);
+    transition: transform .2s, box-shadow .2s, opacity .2s;
+}
+
+.hm-btn-primary:disabled {
+    opacity: .6;
+    cursor: progress;
+}
+
+.hm-arrow {
+    margin-left: auto;
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: opacity .2s, transform .2s;
+}
+
+.hm-btn-secondary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 60px;
+    padding: 0 24px;
+    border-radius: 999px;
+    border: 1.5px solid var(--app-border-strong);
+    background: var(--app-surface);
+    color: var(--app-text);
+    font: 700 16px "Bricolage Grotesque", system-ui, sans-serif;
+    cursor: pointer;
+    transition: transform .2s, border-color .2s, box-shadow .2s, background .2s;
+}
+
+.hm-btn-secondary svg {
+    color: var(--app-accent-strong);
+}
+
+.hm-join {
+    display: flex;
+    gap: 8px;
+}
+
+.hm-join-input {
+    flex: 1;
+    min-width: 0;
+    height: 60px;
+    padding: 0 22px;
+    border-radius: 999px;
+    border: 1.5px solid transparent;
+    background: var(--app-surface-2);
+    color: var(--app-text);
+    font: 500 16px Figtree, system-ui, sans-serif;
+    text-transform: uppercase;
+    transition: border-color .2s, background .2s, box-shadow .2s;
+}
+
+.hm-join-input::placeholder {
+    color: var(--app-text-subtle);
+    text-transform: none;
+}
+
+.hm-join-input:focus {
+    outline: 0;
+    background: var(--app-surface);
+    border-color: var(--app-accent);
+    box-shadow: 0 0 0 4px var(--app-glow);
+}
+
+.hm-join-btn {
+    height: 60px;
+    padding: 0 26px;
+    border-radius: 999px;
+    border: 1.5px solid var(--app-border-strong);
+    background: var(--app-surface);
+    color: var(--app-text);
+    font: 700 15px Figtree, system-ui, sans-serif;
+    cursor: pointer;
+    transition: background .2s, border-color .2s, opacity .2s, transform .2s;
+}
+
+.hm-join-btn:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.hm-error {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: 16px;
+    border: 1.5px solid var(--app-red);
+    background: var(--app-red-soft);
+    color: var(--app-red);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+
+/* ---------- Colonne secondaire ---------- */
+
+.hm-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 64px 0;
+    color: var(--app-text-subtle);
+    font-size: 14px;
+}
+
+.hm-spin {
+    animation: hm-sp .8s linear infinite;
+}
+
+.hm-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 56px 32px;
+    text-align: center;
+    border-radius: 28px;
+    border: 1.5px dashed var(--app-border-strong);
+    background: var(--app-surface);
+}
+
+.hm-empty-ico {
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+    display: grid;
+    place-items: center;
+    background: var(--app-accent-soft);
+    color: var(--app-accent-strong);
+}
+
+.hm-empty strong {
+    display: block;
+    font-size: 15px;
+}
+
+.hm-empty span {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--app-text-muted);
+}
+
+.hm-sections {
+    display: grid;
+    gap: 28px;
+}
+
+.hm-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.hm-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--app-text-muted);
+}
+
+.hm-count {
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    display: inline-grid;
+    place-items: center;
+    background: var(--app-accent-soft);
+    color: var(--app-accent-strong);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.hm-list {
+    display: grid;
+    gap: 10px;
+}
+
+.hm-i-amber {
+    color: var(--app-amber);
+}
+
+.hm-i-accent {
+    color: var(--app-accent-strong);
+}
+
+.hm-i-green {
+    color: var(--app-green);
+}
+
+.hm-i-muted {
+    color: var(--app-text-subtle);
+}
+
+.hm-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 20px;
+    border: 1.5px solid var(--app-border);
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow);
+    transition: border-color .2s, box-shadow .2s, transform .2s;
+}
+
+.hm-item-pending {
+    display: block;
+    border-color: var(--app-amber);
+    background: linear-gradient(160deg, var(--app-amber-soft), var(--app-surface) 70%);
+}
+
+/* Carte « en cours » : plus de liséré ni de fond verts permanents — c'est le
+   contour vert que le brief demandait de retirer. La carte redevient une carte
+   blanche ordinaire, à bordure discrète ; l'état est porté par la pastille
+   `.hm-badge-green` posée À L'INTÉRIEUR (voir `Home.tsx`). La classe reste
+   dans le JSX : elle sert d'ancre au survol sobre, plus bas. */
+
+.hm-item-past {
+    background: var(--app-surface-2);
+    box-shadow: none;
+}
+
+.hm-item-past .hm-item-title {
+    color: var(--app-text-muted);
+}
+
+.hm-item-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.hm-item-info {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.hm-item-text {
+    min-width: 0;
+}
+
+.hm-item-title {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.hm-trunc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hm-item-meta {
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--app-text-muted);
+}
+
+.hm-badge {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    height: 22px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.hm-badge-amber {
+    background: var(--app-amber-soft);
+    color: var(--app-amber);
+}
+
+/* Pastille « En cours ». Même recette que `.dash-badge-green` côté
+   administration : fond `--app-green-soft`, texte vert. En clair toutefois,
+   `--app-green` (#15803d) ne rend que 4,38:1 sur ce fond teinté — sous le
+   seuil AA de 4,5:1 pour un texte de 10,5 px. On descend donc d'un cran dans
+   la même famille (#0e6b32, 5,8:1). Le thème sombre garde `--app-green`, qui
+   y vaut #4ade80 et rend déjà 11:1 : rien à corriger de ce côté. */
+.hm-badge-green {
+    background: var(--app-green-soft);
+    color: var(--app-green);
+}
+
+.hm-root:not([data-theme="dark"]) .hm-badge-green {
+    color: #0e6b32;
+}
+
+/* La pastille ouvre le bloc de texte : elle se place au-dessus du titre.
+   Le `gap` est nécessaire ici — `.hm-badge` n'en définit aucun, ses
+   pastilles existantes (« Terminée », « À venir ») ne portant que du texte ;
+   sans lui, le point toucherait le mot. */
+.hm-badge-live {
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+/* Le point d'activité, repris de `.hm-live-dot`, réduit pour tenir dans la
+   hauteur de 22 px de la pastille. */
+.hm-badge-live .hm-live-dot {
+    width: 7px;
+    height: 7px;
+}
+
+.hm-badge-slate {
+    background: var(--app-slate-soft);
+    color: var(--app-slate);
+}
+
+.hm-badge-block {
+    margin-top: 6px;
+}
+
+.hm-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.hm-act {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 40px;
+    border-radius: 999px;
+    font: 700 13px Figtree, system-ui, sans-serif;
+    cursor: pointer;
+    transition: background .2s, color .2s, border-color .2s, transform .2s;
+}
+
+.hm-act-ok {
+    border: 1.5px solid transparent;
+    background: var(--app-green-soft);
+    color: var(--app-green);
+}
+
+.hm-act-no {
+    border: 1.5px solid var(--app-border-strong);
+    background: transparent;
+    color: var(--app-text-muted);
+}
+
+/* Bouton d'action DANS une carte : indigo UNI, et non le dégradé du bouton
+   principal `.hm-btn-primary`. Le dégradé reste réservé à l'action première de
+   la page (« Nouvelle réunion ») ; le répéter ici mettait chaque « Rejoindre »
+   au même niveau visuel que le CTA. Proportions légèrement élargies au passage
+   (40 px de haut, 20 px de padding). Le contraste du libellé est celui de
+   `--app-on-accent` sur `--app-accent` : 8,6:1 en clair, 4,6:1 en sombre — AA
+   dans les deux thèmes. */
+.hm-join-sm {
+    flex: none;
+    height: 40px;
+    padding: 0 20px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--app-accent);
+    color: var(--app-on-accent);
+    font: 700 13px Figtree, system-ui, sans-serif;
+    cursor: pointer;
+    box-shadow: 0 8px 18px -10px var(--app-accent);
+    transition: background .2s, transform .2s, box-shadow .2s;
+}
+
+.hm-live-dot {
+    position: relative;
+    width: 10px;
+    height: 10px;
+    flex: none;
+}
+
+.hm-live-dot::before,
+.hm-live-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    /* Le point « en direct » est un remplissage pur : aucune lettre ne
+       repose dessus, il peut donc prendre le vert vif. `--app-green`, lui,
+       reste le vert sombre que l'application utilise pour ÉCRIRE du vert. */
+    background: var(--app-green-fill);
+}
+
+.hm-live-dot::before {
+    animation: hm-ping 1.4s cubic-bezier(0, 0, .2, 1) infinite;
+    opacity: .6;
+}
+
+
+/* ---------- Barre mobile ---------- */
+
+.hm-mbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: color-mix(in srgb, var(--app-bg) 88%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--app-border);
+}
+
+.hm-mbar-in {
+    max-width: 1152px;
+    margin: 0 auto;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+}
+
+.hm-mb {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 64px;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 14px;
+    background: transparent;
+    color: var(--app-text-subtle);
+    font: 600 10.5px Figtree, system-ui, sans-serif;
+    cursor: pointer;
+    transition: color .2s, background .2s;
+}
+
+.hm-mb.on {
+    color: var(--app-accent-strong);
+}
+
+.hm-mb-red {
+    color: var(--app-red);
+}
+
+
+/* ---------- Survols (souris uniquement) ---------- */
+
+@media (hover: hover) {
+    .hm-chip:hover,
+    .hm-pill:hover {
+        border-color: var(--app-accent);
+        color: var(--app-text);
+        background: var(--app-surface-2);
+    }
+    .hm-logout:hover {
+        background: var(--app-red);
+        color: #fff;
+        transform: translateY(-1px);
+    }
+    .hm-q:hover {
+        border-color: var(--app-accent);
+        color: var(--app-text);
+        transform: translateY(-1px);
+    }
+    .hm-q.on:hover {
+        color: var(--app-accent-strong);
+    }
+    .hm-btn-primary:not(:disabled):hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 38px -14px var(--app-accent);
+    }
+    .hm-btn-primary:hover .hm-arrow {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    .hm-btn-secondary:hover {
+        transform: translateY(-2px);
+        border-color: var(--app-accent);
+        box-shadow: var(--app-shadow-lg);
+    }
+    .hm-join-btn:not(:disabled):hover {
+        background: var(--app-surface-2);
+        border-color: var(--app-accent);
+    }
+    .hm-item:not(.hm-item-past):hover {
+        transform: translateY(-2px);
+        border-color: var(--app-accent);
+        box-shadow: var(--app-shadow-lg);
+    }
+    .hm-item-pending:hover {
+        border-color: var(--app-amber);
+    }
+    /* Survol de la carte « en cours » : une bordure un peu plus marquée, et
+       rien d'autre. L'ancienne règle `.hm-item-live:hover` (spécificité 0,2,0)
+       ne s'appliquait JAMAIS : la règle générique
+       `.hm-item:not(.hm-item-past):hover` (0,3,0) la battait, et le contour
+       sautait donc à l'indigo — c'est le « passage brutal au bleu » signalé.
+       `.hm-item.hm-item-live:hover` atteint (0,3,0) et, écrite plus bas,
+       l'emporte par l'ordre. La règle générique continue d'apporter le léger
+       décollement et l'ombre : eux seuls suffisent ici. */
+    .hm-item.hm-item-live:hover {
+        border-color: var(--app-border-strong);
+    }
+    .hm-act-ok:hover {
+        background: var(--app-green);
+        color: #fff;
+    }
+    .hm-act-no:hover {
+        background: var(--app-surface-2);
+        color: var(--app-text);
+    }
+    .hm-join-sm:hover {
+        background: var(--app-accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px -10px var(--app-accent);
+    }
+    .hm-mb:hover {
+        background: var(--app-surface-2);
+    }
+}
+
+.hm-btn-primary:active,
+.hm-btn-secondary:active,
+.hm-join-sm:active,
+.hm-act:active,
+.hm-q:active {
+    transform: scale(.97);
+}
+
+@keyframes hm-sp {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes hm-ping {
+    75%,
+    100% {
+        transform: scale(2.4);
+        opacity: 0;
+    }
+}
+
+
+/* ---------- Responsive ---------- */
+
+@media (min-width: 640px) {
+    .hm-chip-name {
+        display: inline;
+    }
+}
+
+@media (min-width: 768px) {
+    .hm-logout {
+        display: inline-flex;
+    }
+    .hm-mbar {
+        display: none;
+    }
+    .hm-main {
+        padding-bottom: 40px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .hm-pill-label {
+        display: inline;
+    }
+    .hm-main {
+        flex-direction: row;
+        gap: 48px;
+        padding-top: 40px;
+    }
+    .hm-col {
+        position: sticky;
+        top: 96px;
+        align-self: flex-start;
+    }
+    .hm-side {
+        max-width: 448px;
+    }
+}
+
+@media (max-width: 520px) {
+    .hm-header-in,
+    .hm-main {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+    .hm-brand-name {
+        font-size: 18px;
+    }
+    .hm-join {
+        flex-direction: column;
+    }
+    .hm-join-btn,
+    .hm-join-input {
+        width: 100%;
+        height: 56px;
+    }
+    .hm-item {
+        padding: 14px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hm-root *,
+    .hm-root *::before,
+    .hm-root *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}

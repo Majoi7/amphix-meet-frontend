@@ -97,16 +97,27 @@
 
 .app-btn-primary {
   background-color: var(--app-accent);
-  color: #1a1200;
+  /* Le libellé doit rester lisible SUR l'indigo. La valeur #1a1200 ne
+     convenait qu'au survol ambré de l'ancien thème sombre : sur l'indigo
+     clair `--app-accent` (#3a2bd0), elle tombait à ≈2,15:1, très en dessous
+     du seuil AA de 4,5:1. `--app-on-accent` vaut #ffffff dans les deux
+     thèmes — ≈8,6:1 en clair, ≈4,6:1 en sombre. */
+  color: var(--app-on-accent);
   font-weight: 600;
 }
 .app-btn-primary:not(:disabled):hover {
-  background-color: var(--app-accent-strong);
+  /* `--app-accent-hover` vaut #22149b en clair (≈12,8:1 avec le blanc) et
+     #5a4aea en sombre (≈5,8:1) : un seul jeton, deux thèmes, AA dans les
+     deux — et le survol clair est inchangé, puisque #22149b est déjà la
+     valeur de `--app-accent-strong`.
+
+     Il remplace l'ancien survol réservé au thème sombre, qui posait #ffe066
+     sur #1a1200 : bien contrasté (≈14:1) mais HORS PALETTE — le bouton
+     indigo devenait jaune au survol, seul vestige de l'ancienne identité
+     ambre. La règle générique suffit désormais aux deux thèmes, la
+     surcharge `[data-theme="dark"]` est donc supprimée. */
+  background-color: var(--app-accent-hover);
   color: #ffffff;
-}
-.app-theme[data-theme="dark"] .app-btn-primary:not(:disabled):hover {
-  background-color: #ffe066;
-  color: #1a1200;
 }
 
 .app-btn-secondary {

@@ -28,10 +28,52 @@ import {
 import { NewBookingModal } from "../components/NewBookingModal";
 import { useAuth } from "../context/AuthContext";
 import { getAvatarColor } from "../lib/avatarColor";
+import "../styles/theme.css";
+import "./home.css";
+
+function Fox() {
+  return (
+    <svg viewBox="70 170 1070 900" aria-hidden="true">
+      <g fill="currentColor" style={{ color: "var(--app-accent-strong)" }}>
+        <path d="M82 650C150 590 380 560 457 718 400 690 360 690 358 700 362 760 345 780 330 770 300 760 260 745 250 748 245 800 215 840 215 872 230 950 310 1000 388 998 260 1030 180 960 160 830 150 720 140 690 82 660Z" />
+        <path d="M370 380C372 350 420 352 480 365 540 378 590 400 620 416 650 398 690 385 714 378 750 290 820 200 870 184 920 200 970 330 978 420 1010 450 1040 490 1052 537L1118 548C1125 555 1110 575 1075 602L1112 610C1090 650 1040 700 982 738 1030 745 1055 780 1052 826 1100 860 1125 910 1120 950 1100 1020 1040 1050 980 1040 940 1030 910 1010 888 990L670 982C660 1010 600 1060 520 1050 470 1040 450 1000 460 940 470 890 510 850 540 836L485 830 512 790 450 795C470 760 490 730 500 712 490 650 495 620 497 622 420 550 372 430 370 380Z" />
+      </g>
+      <circle cx="652" cy="640" r="95" fill="#fff" />
+      <circle cx="881" cy="551" r="95" fill="#fff" />
+      <g fill="currentColor" style={{ color: "var(--app-accent-strong)" }}>
+        <circle cx="677" cy="625" r="43" />
+        <circle cx="904" cy="538" r="43" />
+      </g>
+      <rect x="612" y="772" width="280" height="210" rx="42" fill="#fff" />
+      <rect x="632" y="792" width="240" height="190" rx="26" style={{ fill: "var(--app-accent-strong)" }} />
+      <path
+        d="M893 825L975 782Q1002 772 1002 800V885L950 925Q950 960 990 985Q985 1000 960 992L893 960Z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}
+
+/* Thème clair/sombre selon le système (comme la landing).
+   Si tu as déjà un contexte de thème, remplace ce hook par sa valeur. */
+function useSystemTheme(): "light" | "dark" {
+  const query = "(prefers-color-scheme: dark)";
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    typeof window !== "undefined" && window.matchMedia(query).matches ? "dark" : "light"
+  );
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const onChange = (e: MediaQueryListEvent) => setTheme(e.matches ? "dark" : "light");
+    m.addEventListener("change", onChange);
+    return () => m.removeEventListener("change", onChange);
+  }, []);
+  return theme;
+}
 
 export function Home() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const theme = useSystemTheme();
   const [joinCode, setJoinCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,66 +172,51 @@ export function Home() {
       (showHistory && pastMeetings.length > 0));
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#0a0a0a] text-white">
-      {/* Ambiance de fond */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-[#FFD83D]/8 blur-[140px]" />
-        <div className="absolute right-0 top-1/4 h-[400px] w-[400px] rounded-full bg-[#F5A900]/6 blur-[120px]" />
-        <div className="absolute bottom-0 left-1/4 h-[350px] w-[350px] rounded-full bg-[#ff6b00]/5 blur-[100px]" />
-      </div>
+    <div className="app-theme hm-root" data-theme={theme}>
+      <div className="hm-glow" aria-hidden="true" />
 
-      {/* Header sticky */}
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0a]/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#FFD83D] to-[#F5A900]">
-              <img src="/favicon.svg" alt="" className="h-5 w-5 object-contain" />
-            </div>
-            <span className="text-lg font-bold tracking-tight">Amphix Meet</span>
-          </div>
+      {/* Header */}
+      <header className="hm-header">
+        <div className="hm-header-in">
+          <Link to="/" className="hm-brand">
+            <Fox />
+            <span className="hm-brand-name">Amphix Meet</span>
+          </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="hm-right">
             {user && (
-              <Link
-                to="/profile"
-                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm transition-all hover:bg-white/10"
-              >
+              <Link to="/profile" className="hm-chip">
                 {user.avatarUrl ? (
-  <img
-    src={user.avatarUrl}
-    alt=""
-    className="h-7 w-7 rounded-full object-cover"
-  />
-) : (
-  <span
-    className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-black"
-    style={{ backgroundColor: getAvatarColor(user.id) }}
-  >
-    {user.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
-  </span>
-)}
-                <span className="hidden font-medium sm:inline">{user.name}</span>
+                  <img src={user.avatarUrl} alt="" className="hm-avatar" />
+                ) : (
+                  <span
+                    className="hm-avatar hm-avatar-fb"
+                    style={{ backgroundColor: getAvatarColor(user.id) }}
+                  >
+                    {user.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
+                  </span>
+                )}
+                <span className="hm-chip-name">{user.name}</span>
               </Link>
             )}
-            {/* Accès à l'espace d'administration. Ajout purement additif :
-                aucune action existante n'est déplacée ni modifiée. */}
+
             <Link
-              to="/dashboard"
+              to="/dashboard/admin"
               aria-label="Espace d'administration"
               title="Espace d'administration"
-              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 transition-all hover:bg-white/10 hover:text-white"
+              className="hm-pill"
             >
-              <LayoutDashboard size={14} />
-              <span className="hidden lg:inline">Administration</span>
+              <LayoutDashboard size={16} />
+              <span className="hm-pill-label">Administration</span>
             </Link>
-            {/* Déconnexion desktop uniquement */}
+
             <button
               type="button"
               onClick={handleLogout}
               aria-label="Se déconnecter"
-              className="hidden items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-400 transition-all hover:bg-red-500/20 hover:text-red-300 md:flex"
+              className="hm-logout"
             >
-              <LogOut size={14} />
+              <LogOut size={16} />
               <span>Déconnexion</span>
             </button>
           </div>
@@ -197,101 +224,78 @@ export function Home() {
       </header>
 
       {/* Main */}
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-6 pb-24 sm:px-6 lg:flex-row lg:gap-12 lg:py-10 lg:pb-10">
+      <main className="hm-main">
         {/* Colonne principale */}
-        <div className="flex flex-1 flex-col lg:sticky lg:top-24 lg:self-start">
-          <div className="mb-6">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+        <div className="hm-col">
+          <div className="hm-hello">
+            <h2>
               Bonjour,{" "}
-              <span className="bg-gradient-to-r from-[#FFD83D] to-[#F5A900] bg-clip-text text-transparent">
+              <span className="hm-hello-name">
                 {user?.name?.split(" ")[0] ?? "Utilisateur"}
               </span>
             </h2>
-            <p className="mt-2 text-sm text-white/40">
-              Prêt pour votre prochaine réunion ?
-            </p>
+            <p className="hm-hello-sub">Prêt pour votre prochaine réunion ?</p>
           </div>
 
           {/* Actions rapides */}
-          <div className="mb-6 flex gap-2">
-            <Link
-              to="/profile"
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-white/70 transition-all hover:bg-white/10 hover:text-white"
-            >
-              <User size={14} />
+          <div className="hm-quick">
+            <Link to="/profile" className="hm-q">
+              <User size={15} />
               Profil
             </Link>
             <button
               type="button"
               onClick={() => setShowHistory((s) => !s)}
-              className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-medium transition-all ${
-                showHistory
-                  ? "border-[#FFD83D]/30 bg-[#FFD83D]/10 text-[#FFD83D]"
-                  : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-              }`}
+              className={`hm-q${showHistory ? " on" : ""}`}
             >
-              <History size={14} />
+              <History size={15} />
               Historique
             </button>
-            <Link
-              to="/settings"
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-white/70 transition-all hover:bg-white/10 hover:text-white"
-            >
-              <Settings size={14} />
+            <Link to="/settings" className="hm-q">
+              <Settings size={15} />
               Paramètres
             </Link>
           </div>
 
           {/* Actions principales */}
-          <div className="space-y-3">
+          <div className="hm-actions">
             <button
               type="button"
               onClick={handleCreateRoom}
               disabled={isCreating}
-              className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#FFD83D] to-[#F5A900] px-6 py-4 text-sm font-bold text-[#2B2115] shadow-lg shadow-[#F5A900]/20 transition-all hover:shadow-xl hover:shadow-[#F5A900]/30 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+              className="hm-btn-primary"
             >
-              <div className="absolute inset-0 bg-white/0 transition-colors group-hover:bg-white/15" />
-              {isCreating ? (
-                <Loader2 size={20} className="animate-spin" />
-              ) : (
-                <Plus size={20} />
-              )}
+              {isCreating ? <Loader2 size={20} className="hm-spin" /> : <Plus size={20} />}
               <span>Nouvelle réunion instantanée</span>
-              <ArrowRight
-                size={18}
-                className="ml-auto opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100 -translate-x-2"
-              />
+              <ArrowRight size={18} className="hm-arrow" />
             </button>
 
             <button
               type="button"
               onClick={() => setShowBookingModal(true)}
-              className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-white/90 backdrop-blur-sm transition-all hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0"
+              className="hm-btn-secondary"
             >
-              <CalendarPlus size={20} className="text-[#FFD83D]" />
+              <CalendarPlus size={20} />
               <span>Réserver une séance</span>
             </button>
 
-            <form onSubmit={handleJoin} className="flex gap-2">
+            <form onSubmit={handleJoin} className="hm-join">
               <input
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
                 placeholder="Code de réunion"
-                className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-white placeholder:text-white/25 outline-none transition-all focus:border-[#FFD83D]/40 focus:bg-white/10 focus:ring-2 focus:ring-[#FFD83D]/15"
+                className="hm-join-input"
+                aria-label="Code de réunion"
               />
-              <button
-                type="submit"
-                disabled={!joinCode.trim()}
-                className="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-white/90 transition-all hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-white/5"
-              >
+              <button type="submit" disabled={!joinCode.trim()} className="hm-join-btn">
                 Rejoindre
               </button>
             </form>
           </div>
 
           {error && (
-            <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            <div role="alert" className="hm-error">
               <X size={16} />
               {error}
             </div>
@@ -299,47 +303,40 @@ export function Home() {
         </div>
 
         {/* Colonne secondaire */}
-        <div className="w-full lg:max-w-md">
+        <div className="hm-side">
           {isLoading && (
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-white/30">
-              <Loader2 size={28} className="animate-spin" />
-              <p className="text-sm">Chargement de votre espace…</p>
+            <div className="hm-loading">
+              <Loader2 size={28} className="hm-spin" />
+              <p>Chargement de votre espace…</p>
             </div>
           )}
 
           {!isLoading && !hasSidebarContent && (
-            <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-white/10 bg-white/[0.02] px-8 py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5">
-                <Inbox size={28} className="text-white/20" />
+            <div className="hm-empty">
+              <div className="hm-empty-ico">
+                <Inbox size={28} />
               </div>
               <div>
-                <p className="text-sm font-medium text-white/60">C'est calme ici</p>
-                <p className="mt-1 text-xs text-white/30">
-                  Vos réunions et réservations apparaîtront ici.
-                </p>
+                <strong>C'est calme ici</strong>
+                <span>Vos réunions et réservations apparaîtront ici.</span>
               </div>
             </div>
           )}
 
           {!isLoading && (
-            <div className="space-y-6">
+            <div className="hm-sections">
               {pendingReceivedBookings.length > 0 && (
                 <Section
                   title="Demandes en attente"
-                  icon={<Clock size={14} className="text-amber-400" />}
+                  icon={<Clock size={15} className="hm-i-amber" />}
                   count={pendingReceivedBookings.length}
                 >
                   {pendingReceivedBookings.map((booking) => (
-                    <li
-                      key={booking.id}
-                      className="rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/10 to-transparent p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-white">
-                            {booking.subject}
-                          </p>
-                          <p className="mt-0.5 text-xs text-white/40">
+                    <li key={booking.id} className="hm-item hm-item-pending">
+                      <div className="hm-item-top">
+                        <div className="hm-item-text">
+                          <p className="hm-item-title">{booking.subject}</p>
+                          <p className="hm-item-meta">
                             Avec{" "}
                             {booking.teacherId === user?.id
                               ? booking.studentName
@@ -347,24 +344,22 @@ export function Home() {
                             · {formatDate(booking.startsAt)}
                           </p>
                         </div>
-                        <span className="flex-shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                          En attente
-                        </span>
+                        <span className="hm-badge hm-badge-amber">En attente</span>
                       </div>
-                      <div className="mt-3 flex gap-2">
+                      <div className="hm-row">
                         <button
                           type="button"
                           onClick={() => handleConfirmBooking(booking.id)}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-500/20 px-3 py-2 text-xs font-semibold text-emerald-400 transition-all hover:bg-emerald-500/30"
+                          className="hm-act hm-act-ok"
                         >
-                          <Check size={13} /> Confirmer
+                          <Check size={14} /> Confirmer
                         </button>
                         <button
                           type="button"
                           onClick={() => handleCancelBooking(booking.id)}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-white/50 transition-all hover:bg-white/5 hover:text-white/80"
+                          className="hm-act hm-act-no"
                         >
-                          <X size={13} /> Refuser
+                          <X size={14} /> Refuser
                         </button>
                       </div>
                     </li>
@@ -375,19 +370,14 @@ export function Home() {
               {upcomingBookings.length > 0 && (
                 <Section
                   title="Séances programmées"
-                  icon={<CalendarPlus size={14} className="text-[#FFD83D]" />}
+                  icon={<CalendarPlus size={15} className="hm-i-accent" />}
                   count={upcomingBookings.length}
                 >
                   {upcomingBookings.map((booking) => (
-                    <li
-                      key={booking.id}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-white/[0.03] p-4 transition-all hover:border-white/10 hover:bg-white/[0.05]"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-white">
-                          {booking.subject}
-                        </p>
-                        <p className="mt-0.5 text-xs text-white/40">
+                    <li key={booking.id} className="hm-item">
+                      <div className="hm-item-text">
+                        <p className="hm-item-title hm-trunc">{booking.subject}</p>
+                        <p className="hm-item-meta">
                           Avec{" "}
                           {booking.teacherId === user?.id
                             ? booking.studentName
@@ -395,7 +385,7 @@ export function Home() {
                           · {formatDate(booking.startsAt)}
                         </p>
                         {booking.status === "PENDING" && (
-                          <span className="mt-1.5 inline-block rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                          <span className="hm-badge hm-badge-amber hm-badge-block">
                             En attente
                           </span>
                         )}
@@ -404,7 +394,7 @@ export function Home() {
                         <button
                           type="button"
                           onClick={() => handleStartBooking(booking.id)}
-                          className="flex-shrink-0 rounded-xl bg-gradient-to-r from-[#FFD83D] to-[#F5A900] px-4 py-2 text-xs font-bold text-[#2B2115] shadow-lg shadow-[#F5A900]/20 transition-all hover:shadow-xl hover:shadow-[#F5A900]/30 hover:-translate-y-0.5 active:translate-y-0"
+                          className="hm-join-sm"
                         >
                           Rejoindre
                         </button>
@@ -414,27 +404,32 @@ export function Home() {
                 </Section>
               )}
 
+              {/* Pas de `count` ici, contrairement aux autres sections : le
+                  nombre de réunions en cours est déjà porté par la pastille
+                  « En cours » de chaque ligne, et le chiffre seul, posé dans
+                  l'en-tête, ne s'expliquait pas. Les autres sections gardent
+                  leur compteur, qui reste la seule indication de volume. */}
               {activeMeetings.length > 0 && (
                 <Section
                   title="En cours"
-                  icon={<Video size={14} className="text-emerald-400" />}
-                  count={activeMeetings.length}
+                  icon={<Video size={15} className="hm-i-green" />}
                 >
                   {activeMeetings.map((meeting) => (
-                    <li
-                      key={meeting.meetingId}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-white">
-                            {meeting.title}
-                          </p>
-                          <p className="text-xs text-white/40">
+                    <li key={meeting.meetingId} className="hm-item hm-item-live">
+                      <div className="hm-item-info">
+                        <div className="hm-item-text">
+                          {/* L'état vit maintenant DANS la carte, au-dessus du
+                              titre, au lieu d'être un contour vert sur toute la
+                              carte. `hm-live-dot` (le point qui pulse) est
+                              déplacé ici : `aria-hidden` parce que le mot
+                              « En cours » juste à côté dit déjà la même chose
+                              à un lecteur d'écran. */}
+                          <span className="hm-badge hm-badge-green hm-badge-live">
+                            <span className="hm-live-dot" aria-hidden="true" />
+                            En cours
+                          </span>
+                          <p className="hm-item-title hm-trunc">{meeting.title}</p>
+                          <p className="hm-item-meta">
                             {meeting.isHost ? "Vous êtes l'hôte" : `Par ${meeting.hostName}`} ·{" "}
                             {formatDate(meeting.createdAt)}
                           </p>
@@ -443,7 +438,7 @@ export function Home() {
                       <button
                         type="button"
                         onClick={() => navigate(`/room/${meeting.joinCode}`)}
-                        className="flex-shrink-0 rounded-xl bg-gradient-to-r from-[#FFD83D] to-[#F5A900] px-4 py-2 text-xs font-bold text-[#2B2115] shadow-lg shadow-[#F5A900]/20 transition-all hover:shadow-xl hover:shadow-[#F5A900]/30 hover:-translate-y-0.5 active:translate-y-0"
+                        className="hm-join-sm"
                       >
                         Rejoindre
                       </button>
@@ -455,25 +450,18 @@ export function Home() {
               {showHistory && pastMeetings.length > 0 && (
                 <Section
                   title="Réunions récentes"
-                  icon={<CheckCircle2 size={14} className="text-white/30" />}
+                  icon={<CheckCircle2 size={15} className="hm-i-muted" />}
                 >
                   {pastMeetings.slice(0, 5).map((meeting) => (
-                    <li
-                      key={meeting.meetingId}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-4"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-white/70">
-                          {meeting.title}
-                        </p>
-                        <p className="text-xs text-white/25">
+                    <li key={meeting.meetingId} className="hm-item hm-item-past">
+                      <div className="hm-item-text">
+                        <p className="hm-item-title hm-trunc">{meeting.title}</p>
+                        <p className="hm-item-meta">
                           {meeting.isHost ? "Vous êtes l'hôte" : `Par ${meeting.hostName}`} ·{" "}
                           {formatDate(meeting.createdAt)}
                         </p>
                       </div>
-                      <span className="flex-shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-white/30">
-                        Terminée
-                      </span>
+                      <span className="hm-badge hm-badge-slate">Terminée</span>
                     </li>
                   ))}
                 </Section>
@@ -483,43 +471,31 @@ export function Home() {
         </div>
       </main>
 
-      {/* Footer mobile — déconnexion rouge */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/5 bg-[#0a0a0a]/90 backdrop-blur-xl md:hidden">
-        <div className="mx-auto flex max-w-6xl items-center justify-around px-4 py-3">
+      {/* Barre mobile */}
+      <nav className="hm-mbar" aria-label="Navigation mobile">
+        <div className="hm-mbar-in">
           <button
             type="button"
             onClick={() => setShowHistory((s) => !s)}
-            className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-colors ${
-              showHistory ? "text-[#FFD83D]" : "text-white/40"
-            }`}
+            className={`hm-mb${showHistory ? " on" : ""}`}
           >
             <History size={20} />
             Historique
           </button>
-          <Link
-            to="/profile"
-            className="flex flex-col items-center gap-1 text-[10px] font-medium text-white/40 transition-colors hover:text-white/70"
-          >
+          <Link to="/profile" className="hm-mb">
             <User size={20} />
             Profil
           </Link>
-          <Link
-            to="/settings"
-            className="flex flex-col items-center gap-1 text-[10px] font-medium text-white/40 transition-colors hover:text-white/70"
-          >
+          <Link to="/settings" className="hm-mb">
             <Settings size={20} />
             Paramètres
           </Link>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex flex-col items-center gap-1 text-[10px] font-medium text-red-400 transition-colors hover:text-red-300"
-          >
+          <button type="button" onClick={handleLogout} className="hm-mb hm-mb-red">
             <LogOut size={20} />
             Déconnexion
           </button>
         </div>
-      </div>
+      </nav>
 
       {showBookingModal && (
         <NewBookingModal
@@ -543,20 +519,14 @@ interface SectionProps {
 function Section({ title, icon, count, children }: SectionProps) {
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="hm-section-head">
+        <div className="hm-section-title">
           {icon}
-          <span className="text-xs font-semibold uppercase tracking-wider text-white/50">
-            {title}
-          </span>
+          <span>{title}</span>
         </div>
-        {count !== undefined && (
-          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-bold text-white/40">
-            {count}
-          </span>
-        )}
+        {count !== undefined && <span className="hm-count">{count}</span>}
       </div>
-      <ul className="space-y-2">{children}</ul>
+      <ul className="hm-list">{children}</ul>
     </div>
   );
 }

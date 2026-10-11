@@ -70,14 +70,14 @@ function DashboardShell() {
   // Compteurs de la navigation — tous issus des données réellement chargées.
   const counts = useMemo<Partial<Record<string, number>>>(() => {
     const result: Partial<Record<string, number>> = {
-      "/dashboard/meetings": meetings.length,
-      "/dashboard/history": meetings.filter(
+      "/dashboard/admin/meetings": meetings.length,
+      "/dashboard/admin/history": meetings.filter(
         (meeting) => meeting.status === "COMPLETED" || meeting.status === "CANCELLED"
       ).length,
     };
     const peopleCount = buildPeople(user, bookings).length;
     // Un « 1 » serait toujours votre propre compte : il n'apprend rien.
-    if (peopleCount > 1) result["/dashboard/users"] = peopleCount;
+    if (peopleCount > 1) result["/dashboard/admin/users"] = peopleCount;
     return result;
   }, [meetings, bookings, user]);
 

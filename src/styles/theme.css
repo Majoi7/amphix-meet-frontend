@@ -1,128 +1,158 @@
-/* ══════════════════════════════════════════════════════════════════════
-   Jetons de thème PARTAGÉS — source unique de vérité.
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&display=swap");
 
-   POURQUOI CE FICHIER EXISTE
-   L'espace d'administration et l'espace mathématique doivent suivre le
-   MÊME thème : une seule préférence, un seul jeu de couleurs. Recopier
-   ces valeurs dans un second fichier aurait créé deux systèmes qui
-   divergent à la première retouche.
-
-   CE QUI N'A PAS CHANGÉ
-   La salle de réunion reste en dehors de tout cela. Elle n'utilise que
-   la palette Tailwind `meet-*` de `tailwind.config.js`, qui n'a
-   volontairement pas de clé `darkMode` : aucun réglage global n'a été
-   activé, donc la réunion ne peut pas être affectée par ce fichier.
-
-   DEUX NOMS POUR LES MÊMES JETONS
-   Les jetons canoniques s'appellent `--app-*`. Les composants déjà
-   écrits de l'administration utilisent `--dash-*` : ces noms restent
-   déclarés en ALIAS (`--dash-bg: var(--app-bg)`), ce qui évite de
-   toucher à leur code tout en gardant une seule définition des valeurs.
-
-   Basculer clair/sombre = changer `data-theme` sur l'élément porteur.
-   ══════════════════════════════════════════════════════════════════════ */
+/* Jetons partagés (admin + espace mathématique), palette de la landing.
+   La salle de réunion reste hors de ce fichier (palette Tailwind meet-*).
+   Les noms --dash-* sont des alias de --app-*.
+   Clair/sombre = attribut data-theme sur l'élément porteur. */
 
 .app-theme,
 .dash-root {
-  /* ---- Jetons CLAIRS : valeurs par défaut ---------------------------- */
-  --app-bg: #f6f7f9;             /* fond de page, gris très clair */
-  --app-surface: #ffffff;        /* cartes, barre latérale, en-tête */
-  --app-surface-2: #f1f3f5;      /* survol, remplissages discrets */
-  --app-surface-3: #e8ebee;      /* état actif, séparateurs pleins */
-  --app-border: #e4e7eb;         /* bordures fines */
-  --app-border-strong: #ccd2d9;
+    --app-bg: #f7f6ff;
+    --app-surface: #ffffff;
+    --app-surface-2: #f0eeff;
+    --app-surface-3: #e6e2fb;
+    --app-border: #e3e0f7;
+    --app-border-strong: #cfcaf0;
+    --app-text: #14103a;
+    --app-text-muted: #5b5880;
+    /* #8481a8 ne donnait que 3,44:1 sur --app-bg (#f7f6ff) et 3,69:1 sur
+       --app-surface (blanc) : sous le seuil AA de 4,5:1. Or ce jeton porte du
+       texte réellement petit — 10,5 px (.hm-mb, .app-table th), 11 px
+       (.app-label, .app-arrow, .dash-table th, .dash-nav-group-label,
+       .dash-nav-count) et 11,5 px (.app-card-desc, .app-result-label) dans
+       les feuilles, plus une quarantaine de `text-[11px]` à `text-[12.5px]`
+       posés en ligne dans les vues des deux espaces.
 
-  --app-text: #101317;           /* texte principal, quasi noir */
-  --app-text-muted: #656d78;     /* texte secondaire, gris moyen */
-  --app-text-subtle: #8a929d;    /* texte tertiaire */
+       #6a6789 donne 5,0:1 sur --app-bg et 5,4:1 sur blanc, tout en restant
+       plus clair que --app-text-muted (#5b5880, 6,2:1) : la hiérarchie des
+       trois niveaux de texte est donc conservée, dans le même ordre. Le
+       thème sombre n'est pas concerné — #8782bb y rend déjà 5,4:1. */
+    --app-text-subtle: #6a6789;
+    --app-accent: #3a2bd0;
+    --app-accent-strong: #22149b;
+    --app-accent-soft: rgba(58, 43, 208, 0.1);
+    --app-accent-hover: #22149b;
+    --app-on-accent: #ffffff;
+    --app-btn-1: #3a2bd0;
+    --app-btn-2: #22149b;
+    --app-glow: rgba(58, 43, 208, 0.14);
+    --app-focus: #3a2bd0;
+    --app-green: #15803d;
+    --app-green-soft: rgba(21, 128, 61, 0.1);
+    /* Vert de REMPLISSAGE — points d'état, pastilles —, jamais du texte.
+       #15803d ci-dessus est calibré pour être LU (5,0:1 sur blanc) ; il fait
+       un point de 10 px terne. #22c55e est le vert vif de la palette cible,
+       et rien ne s'écrit dessus : le contraste à tenir est celui du point
+       contre son fond, pas d'un libellé contre le point.
 
-  --app-accent: #f5a900;         /* ambre Amphix — remplissage */
-  --app-accent-strong: #8a5a00;  /* ambre lisible SUR fond clair (texte) */
-  --app-accent-soft: rgba(245, 169, 0, 0.12);
-
-  --app-green: #15803d;
-  --app-green-soft: rgba(21, 128, 61, 0.1);
-  --app-blue: #1d4ed8;
-  --app-blue-soft: rgba(29, 78, 216, 0.1);
-  --app-red: #b91c1c;
-  --app-red-soft: rgba(185, 28, 28, 0.1);
-  --app-slate: #5b6472;
-  --app-slate-soft: rgba(91, 100, 114, 0.1);
-
-  --app-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-  --app-shadow-lg: 0 10px 28px rgba(16, 24, 40, 0.09);
-
-  color-scheme: light;
+       Le rouge et l'ambre n'ont pas d'équivalent ici, et c'est délibéré :
+       partout où l'un ou l'autre sert de remplissage dans l'application,
+       c'est sous un libellé blanc (déconnexion, action « accepter »), où la
+       version vive tomberait à 2,3:1 pour le vert et 3,8:1 pour le rouge —
+       sous le seuil AA dans les deux cas. Un jeton sans consommateur
+       n'aurait fait qu'ajouter du code mort ; il sera créé le jour où un
+       point d'état rouge ou ambre apparaîtra. */
+    --app-green-fill: #22c55e;
+    --app-blue: #0b6bcb;
+    --app-blue-soft: rgba(11, 107, 203, 0.1);
+    --app-red: #d93a4a;
+    --app-red-soft: rgba(217, 58, 74, 0.1);
+    --app-amber: #b45309;
+    --app-amber-soft: rgba(245, 158, 11, 0.14);
+    --app-slate: #5b5880;
+    --app-slate-soft: rgba(91, 88, 128, 0.1);
+    --app-shadow: 0 1px 2px rgba(34, 20, 155, 0.05);
+    --app-shadow-lg: 0 24px 50px -24px rgba(34, 20, 155, 0.35);
+    font-family: Figtree, system-ui, sans-serif;
+    color-scheme: light;
 }
 
 .app-theme[data-theme="dark"],
 .dash-root[data-theme="dark"] {
-  /* ---- Jetons SOMBRES ------------------------------------------------ */
-  --app-bg: #0d0e11;
-  --app-surface: #16181d;
-  --app-surface-2: #1d2027;
-  --app-surface-3: #262a32;
-  --app-border: #272b33;
-  --app-border-strong: #3a3f49;
-
-  --app-text: #f1f3f6;
-  --app-text-muted: #9aa2ad;
-  --app-text-subtle: #767e89;
-
-  --app-accent: #ffd83d;
-  --app-accent-strong: #ffd83d;
-  --app-accent-soft: rgba(255, 216, 61, 0.13);
-
-  --app-green: #4ade80;
-  --app-green-soft: rgba(74, 222, 128, 0.13);
-  --app-blue: #7cabff;
-  --app-blue-soft: rgba(124, 171, 255, 0.14);
-  --app-red: #f87171;
-  --app-red-soft: rgba(248, 113, 113, 0.13);
-  --app-slate: #9aa2ad;
-  --app-slate-soft: rgba(154, 162, 173, 0.13);
-
-  --app-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02);
-  --app-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
-
-  color-scheme: dark;
+    --app-bg: #0d0a2b;
+    --app-surface: #141040;
+    --app-surface-2: #1b1650;
+    --app-surface-3: #241d66;
+    --app-border: #2a2470;
+    --app-border-strong: #3a3290;
+    --app-text: #f1efff;
+    --app-text-muted: #a9a5d6;
+    --app-text-subtle: #8782bb;
+    --app-accent: #6d5ef5;
+    --app-accent-strong: #8f84ff;
+    --app-accent-soft: rgba(143, 132, 255, 0.16);
+    --app-accent-hover: #5a4aea;
+    --app-on-accent: #ffffff;
+    --app-btn-1: #6d5ef5;
+    --app-btn-2: #4a3be0;
+    --app-glow: rgba(143, 132, 255, 0.18);
+    --app-focus: #8f84ff;
+    --app-green: #4ade80;
+    --app-green-soft: rgba(74, 222, 128, 0.13);
+    /* Le vert du thème sombre est déjà vif : sur #0d0a2b, #4ade80 rend
+       11:1 et sert indifféremment de texte ou de remplissage. Le jeton
+       pointe donc sur la MÊME valeur — la paire existe pour que l'appelant
+       n'ait pas à choisir, pas pour créer une seconde teinte. */
+    --app-green-fill: #4ade80;
+    --app-blue: #7cc0ff;
+    --app-blue-soft: rgba(124, 192, 255, 0.14);
+    --app-red: #ff7a86;
+    --app-red-soft: rgba(255, 122, 134, 0.14);
+    --app-amber: #fbbf24;
+    --app-amber-soft: rgba(251, 191, 36, 0.14);
+    --app-slate: #a9a5d6;
+    --app-slate-soft: rgba(169, 165, 214, 0.14);
+    --app-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02);
+    --app-shadow-lg: 0 24px 50px -24px rgba(0, 0, 0, 0.7);
+    color-scheme: dark;
 }
 
-/* ---- Alias historiques : l'administration utilise `--dash-*` --------- */
 .app-theme,
 .dash-root {
-  --dash-bg: var(--app-bg);
-  --dash-surface: var(--app-surface);
-  --dash-surface-2: var(--app-surface-2);
-  --dash-surface-3: var(--app-surface-3);
-  --dash-border: var(--app-border);
-  --dash-border-strong: var(--app-border-strong);
-
-  --dash-text: var(--app-text);
-  --dash-text-muted: var(--app-text-muted);
-  --dash-text-subtle: var(--app-text-subtle);
-
-  --dash-accent: var(--app-accent);
-  --dash-accent-strong: var(--app-accent-strong);
-  --dash-accent-soft: var(--app-accent-soft);
-
-  --dash-green: var(--app-green);
-  --dash-green-soft: var(--app-green-soft);
-  --dash-blue: var(--app-blue);
-  --dash-blue-soft: var(--app-blue-soft);
-  --dash-red: var(--app-red);
-  --dash-red-soft: var(--app-red-soft);
-  --dash-slate: var(--app-slate);
-  --dash-slate-soft: var(--app-slate-soft);
-
-  --dash-shadow: var(--app-shadow);
-  --dash-shadow-lg: var(--app-shadow-lg);
+    --dash-bg: var(--app-bg);
+    --dash-surface: var(--app-surface);
+    --dash-surface-2: var(--app-surface-2);
+    --dash-surface-3: var(--app-surface-3);
+    --dash-border: var(--app-border);
+    --dash-border-strong: var(--app-border-strong);
+    --dash-text: var(--app-text);
+    --dash-text-muted: var(--app-text-muted);
+    --dash-text-subtle: var(--app-text-subtle);
+    --dash-accent: var(--app-accent);
+    --dash-accent-strong: var(--app-accent-strong);
+    --dash-accent-soft: var(--app-accent-soft);
+    --dash-accent-hover: var(--app-accent-hover);
+    --dash-on-accent: var(--app-on-accent);
+    --dash-btn-1: var(--app-btn-1);
+    --dash-btn-2: var(--app-btn-2);
+    --dash-glow: var(--app-glow);
+    --dash-green: var(--app-green);
+    --dash-green-soft: var(--app-green-soft);
+    --dash-green-fill: var(--app-green-fill);
+    --dash-blue: var(--app-blue);
+    --dash-blue-soft: var(--app-blue-soft);
+    --dash-red: var(--app-red);
+    --dash-red-soft: var(--app-red-soft);
+    --dash-amber: var(--app-amber);
+    --dash-amber-soft: var(--app-amber-soft);
+    --dash-slate: var(--app-slate);
+    --dash-slate-soft: var(--app-slate-soft);
+    --dash-shadow: var(--app-shadow);
+    --dash-shadow-lg: var(--app-shadow-lg);
 }
 
-/* Anneau de focus clavier — celui de l'administration et de MathSpace,
-   jamais celui de la réunion. */
+.app-theme h1,
+.app-theme h2,
+.app-theme h3,
+.dash-root h1,
+.dash-root h2,
+.dash-root h3 {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+}
+
 .app-theme :focus-visible,
 .dash-root :focus-visible {
-  outline: 2px solid var(--app-accent-strong);
-  outline-offset: 2px;
+    outline: 3px solid var(--app-focus);
+    outline-offset: 3px;
 }

@@ -1,0 +1,358 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Profil — recettes de la page.
+
+   CE QUI EST PARTAGÉ, CE QUI NE L'EST PAS
+   Les couleurs ne sont pas définies ici : elles viennent de
+   `src/styles/theme.css` (jetons `--app-*`), le même fichier que celui de
+   l'accueil (`hm-*`), de l'espace mathématique (`app-*`) et de
+   l'administration (`dash-*`). Le profil suit donc la bascule clair/sombre
+   comme eux — il n'est plus la seule page de navigation figée en sombre.
+
+   Ce fichier ne contient que des RECETTES de mise en page, exprimées avec
+   ces jetons et calquées sur celles de l'accueil : même carte, mêmes
+   champs, même bouton principal, mêmes rayons. Les classes portent le
+   préfixe `pf-` pour ne croiser ni `hm-*`, ni `dash-*`, ni `app-*`, ni
+   `meet-*` — la salle de réunion ne peut pas être affectée.
+
+   La page importe `theme.css` AVANT ce fichier (`Profile.tsx`).
+   ══════════════════════════════════════════════════════════════════════ */
+
+.pf-root {
+    position: relative;
+    isolation: isolate;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    background: var(--app-bg);
+    color: var(--app-text);
+    font-family: Figtree, system-ui, sans-serif;
+    padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+        calc(64px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- Fond blanc pur (thème clair seulement) ----
+
+   Même demande que pour l'accueil, et même méthode : `--app-bg` (#f7f6ff)
+   reste partagé par l'espace mathématique et l'administration, on ne le
+   change donc pas dans `theme.css` — on le surcharge ici, à la racine de la
+   page, et seulement en clair.
+
+   La carte, elle, ne bouge pas : elle vaut déjà #ffffff en clair. C'est donc
+   `.pf-card` qui porte la distinction — bordure `--app-border` et
+   `--app-shadow-lg`, une ombre indigo large et teintée qui reste lisible sur
+   du blanc pur (elle l'était déjà : la carte blanche était posée sur
+   #f7f6ff, pas sur cette page). */
+.pf-root:not([data-theme="dark"]) {
+    --app-bg: #ffffff;
+}
+
+.pf-root *,
+.pf-root *::before,
+.pf-root *::after {
+    box-sizing: border-box;
+}
+
+.pf-root a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.pf-root h1 {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+
+.pf-root p {
+    margin: 0;
+}
+
+@media (min-width: 640px) {
+    .pf-root {
+        padding-left: max(24px, env(safe-area-inset-left));
+        padding-right: max(24px, env(safe-area-inset-right));
+    }
+}
+
+
+/* ---------- Halo ----------
+   Les deux taches floutées de la version sombre (une bleue, une rose)
+   n'avaient de sens que dans la palette `meet-*`. L'espace clair n'a qu'un
+   accent : un seul halo indigo, celui de l'accueil. Il est `position:
+   fixed` et ne réclame donc aucune place dans la mise en page. */
+
+.pf-glow {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(ellipse 900px 520px at 50% -140px, var(--app-glow), transparent 68%);
+}
+
+
+/* ---------- Colonne ---------- */
+
+.pf-wrap {
+    width: 100%;
+    max-width: 512px;
+    margin: 0 auto;
+}
+
+.pf-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    /* Le lien d'origine ne faisait que la hauteur de son texte — une
+       vingtaine de pixels, sous le seuil tactile de 44 px. Il est le seul
+       moyen de quitter la page sur mobile : il mérite sa cible. */
+    min-height: 44px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: var(--app-text-muted);
+    transition: color 0.2s;
+}
+
+
+/* ---------- Carte ---------- */
+
+.pf-card {
+    border: 1px solid var(--app-border);
+    border-radius: 16px;
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow-lg);
+    padding: 24px;
+}
+
+@media (min-width: 640px) {
+    .pf-card {
+        padding: 32px;
+    }
+}
+
+
+/* ---------- Identité ---------- */
+
+.pf-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.pf-avatar-wrap {
+    position: relative;
+    flex: none;
+}
+
+.pf-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    overflow: hidden;
+    border-radius: 999px;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+/* Le repli des initiales garde une couleur FIXE, identique en clair et en
+   sombre. `getAvatarColor` ne rend que des pastels clairs, choisis pour
+   porter du texte sombre : un jeton qui basculerait (`--app-text` vaut
+   #f1efff en sombre) effacerait les initiales sur les teintes les plus
+   pâles. C'est la même décision que `.hm-avatar-fb` sur l'accueil. */
+.pf-avatar-fb {
+    color: #14103a;
+}
+
+.pf-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.pf-file {
+    display: none;
+}
+
+.pf-photo {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--app-accent);
+    color: var(--app-on-accent);
+    /* L'anneau reprend le fond de la carte, pas celui de la page : la
+       pastille est posée SUR la carte et doit s'y découper. */
+    box-shadow: 0 0 0 2px var(--app-surface);
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+}
+
+.pf-photo:disabled {
+    opacity: 0.6;
+    cursor: progress;
+}
+
+.pf-id {
+    min-width: 0;
+}
+
+.pf-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--app-text);
+}
+
+.pf-role {
+    font-size: 14px;
+    color: var(--app-text-muted);
+}
+
+
+/* ---------- Formulaire ---------- */
+
+.pf-form {
+    display: grid;
+    gap: 16px;
+}
+
+/* Groupe libellé + champ — c'est l'élément de la grille ci-dessus. Un
+   élément de grille vaut `min-width: auto` par défaut : sans ce
+   `min-width: 0`, une adresse email longue et insécable élargirait la
+   colonne au-delà de la carte au lieu de se replier à l'intérieur. */
+.pf-field {
+    min-width: 0;
+}
+
+.pf-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    color: var(--app-text-muted);
+}
+
+.pf-input {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 16px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 10px;
+    background: var(--app-surface-2);
+    color: var(--app-text);
+    font: 500 14px Figtree, system-ui, sans-serif;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.pf-input::placeholder {
+    color: var(--app-text-subtle);
+}
+
+.pf-input:focus {
+    outline: none;
+    background: var(--app-surface);
+    border-color: var(--app-accent);
+    box-shadow: 0 0 0 4px var(--app-accent-soft);
+}
+
+/* Champ en lecture seule (l'adresse email ne se modifie pas ici) : il est
+   volontairement plus discret que `.pf-input` — bord plus tendre, texte
+   atténué — pour qu'on ne cherche pas à le remplir. */
+.pf-static {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    background: var(--app-surface-2);
+    color: var(--app-text-subtle);
+    font-size: 14px;
+    /* Une adresse email n'a pas d'espace où se couper : sans cette règle,
+       elle déborde de la carte au lieu de passer à la ligne. */
+    overflow-wrap: anywhere;
+}
+
+
+/* ---------- Bouton principal ----------
+   Même recette que `.hm-btn-primary` : dégradé `--app-btn-1` → `--app-btn-2`
+   et libellé `--app-on-accent`. Le dégradé bleu→rose de la version sombre
+   n'existe plus — l'espace clair n'a qu'un accent, et le rose n'y a pas de
+   jeton. */
+
+.pf-submit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 24px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--app-btn-1), var(--app-btn-2));
+    color: var(--app-on-accent);
+    font: 700 15px "Bricolage Grotesque", system-ui, sans-serif;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    box-shadow: 0 14px 30px -14px var(--app-accent);
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+
+.pf-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.pf-submit:active {
+    transform: scale(0.98);
+}
+
+
+/* ---------- Erreur ----------
+   Le message était rendu en jaune (`text-meet-yellow`) : la salle de
+   réunion réserve cette teinte au partage d'écran, pas à l'échec. Il prend
+   le rouge d'erreur de l'application, celui que l'accueil utilise déjà. */
+
+.pf-error {
+    text-align: center;
+    font-size: 14px;
+    color: var(--app-red);
+}
+
+
+/* ---------- Survols (appareils avec souris uniquement) ---------- */
+
+@media (hover: hover) {
+    .pf-back:hover {
+        color: var(--app-text);
+    }
+    .pf-photo:not(:disabled):hover {
+        transform: scale(1.05);
+    }
+    .pf-submit:not(:disabled):hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 38px -14px var(--app-accent);
+    }
+}
+
+
+/* ---------- Mouvement réduit ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .pf-root *,
+    .pf-root *::before,
+    .pf-root *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}

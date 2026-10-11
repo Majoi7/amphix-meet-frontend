@@ -1,0 +1,533 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&display=swap");
+
+/* ==========================================================
+   REGISTER : tout est scopé sous .rg-root
+   (les règles globales :root / body / * / a du HTML d'origine
+   sont ramenées ici pour ne PAS impacter la landing page)
+   ========================================================== */
+
+
+/* ---------- Variables (thème clair par défaut) ---------- */
+
+.rg-root {
+    --ind: #22149b;
+    --ind2: #3a2bd0;
+    --tint: #f0eeff;
+    --bg: #fff;
+    --fg: #14103a;
+    --mut: #5b5880;
+    --line: #e3e0f7;
+    --card: #fff;
+    --field: #f5f4fc;
+    --glow: rgba(58, 43, 208, 0.14);
+    --shadow: 0 30px 60px -30px rgba(34, 20, 155, 0.35);
+    --err: #d93a4a;
+}
+
+
+/* ---------- Thème sombre automatique (préférence système) ---------- */
+
+@media (prefers-color-scheme: dark) {
+     :root:not([data-theme="light"]) .rg-root:not([data-theme="light"]) {
+        --ind: #8f84ff;
+        --ind2: #6d5ef5;
+        --tint: #1b1650;
+        --bg: #0d0a2b;
+        --fg: #f1efff;
+        --mut: #a9a5d6;
+        --line: #2a2470;
+        --card: #141040;
+        --field: #1b1650;
+        --glow: rgba(143, 132, 255, 0.18);
+        --shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.7);
+        --err: #ff7a86;
+    }
+}
+
+
+/* ---------- Thème sombre forcé ---------- */
+
+:root[data-theme="dark"] .rg-root,
+.rg-root[data-theme="dark"] {
+    --ind: #8f84ff;
+    --ind2: #6d5ef5;
+    --tint: #1b1650;
+    --bg: #0d0a2b;
+    --fg: #f1efff;
+    --mut: #a9a5d6;
+    --line: #2a2470;
+    --card: #141040;
+    --field: #1b1650;
+    --glow: rgba(143, 132, 255, 0.18);
+    --shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.7);
+    --err: #ff7a86;
+}
+
+
+/* ---------- Reset scopé ---------- */
+
+.rg-root,
+.rg-root *,
+.rg-root *::before,
+.rg-root *::after {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+
+/* ---------- Équivalent du <body> d'origine ---------- */
+
+.rg-root {
+    position: relative;
+    isolation: isolate;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+    overflow-x: hidden;
+    background: var(--bg);
+    color: var(--fg);
+    font: 400 16px/1.5 Figtree, system-ui, sans-serif;
+    -webkit-text-size-adjust: 100%;
+}
+
+
+/* Halo lumineux (body::before d'origine) */
+
+.rg-root::before {
+    content: "";
+    position: fixed;
+    left: 50%;
+    top: -120px;
+    width: min(900px, 140%);
+    height: 560px;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: -1;
+    background: radial-gradient(ellipse at center, var(--glow), transparent 68%);
+}
+
+.rg-root h1,
+.rg-root .rg-logo {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+}
+
+.rg-root a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.rg-root :focus-visible {
+    outline: 3px solid var(--ind2);
+    outline-offset: 3px;
+}
+
+
+/* ---------- Carte ---------- */
+
+.rg-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: 32px;
+    padding: 40px 34px 30px;
+    box-shadow: var(--shadow);
+    animation: rg-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+
+/* ---------- Logo ---------- */
+
+.rg-root .rg-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 20px;
+    margin-bottom: 26px;
+}
+
+.rg-logo svg {
+    width: 36px;
+    height: 31px;
+}
+
+
+/* ---------- Titre ---------- */
+
+.rg-title {
+    font-size: 32px;
+    line-height: 1.1;
+    font-weight: 800;
+    margin: 0 0 6px;
+}
+
+.rg-new {
+    margin: 0 0 26px;
+    font-size: 15px;
+    color: var(--mut);
+}
+
+.rg-root .rg-new a {
+    color: var(--fg);
+    font-weight: 700;
+    transition: color 0.2s;
+}
+
+
+/* ---------- Champs ---------- */
+
+.rg-field {
+    position: relative;
+    margin-bottom: 14px;
+}
+
+.rg-field>svg.rg-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    width: 20px;
+    height: 20px;
+    transform: translateY(-50%);
+    color: var(--mut);
+    pointer-events: none;
+}
+
+.rg-input {
+    width: 100%;
+    height: 54px;
+    border: 1.5px solid transparent;
+    border-radius: 16px;
+    background: var(--field);
+    color: var(--fg);
+    font: 500 16px Figtree, sans-serif;
+    padding: 0 48px 0 46px;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.rg-input::placeholder {
+    color: var(--mut);
+    opacity: 0.8;
+}
+
+.rg-input:focus {
+    outline: 0;
+    background: var(--card);
+    border-color: var(--ind2);
+    box-shadow: 0 0 0 4px var(--glow);
+}
+
+.rg-field.bad .rg-input {
+    border-color: var(--err);
+    background: var(--card);
+}
+
+
+/* ---------- Bouton œil ---------- */
+
+.rg-eye {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 12px;
+    color: var(--mut);
+    display: grid;
+    place-items: center;
+    transition: color 0.2s, background 0.2s;
+}
+
+.rg-eye svg {
+    width: 20px;
+    height: 20px;
+}
+
+.rg-eye .off {
+    display: none;
+}
+
+.rg-eye.on .off {
+    display: block;
+}
+
+.rg-eye.on .show {
+    display: none;
+}
+
+
+/* ---------- Messages d'erreur de champ ---------- */
+
+.rg-msg {
+    display: none;
+    margin: -6px 4px 12px;
+    font-size: 13px;
+    color: var(--err);
+}
+
+.rg-field.bad+.rg-msg {
+    display: block;
+}
+
+
+/* ---------- Choix du rôle ---------- */
+
+.rg-role {
+    margin: 4px 0 22px;
+}
+
+.rg-role-label {
+    display: block;
+    margin: 0 0 8px 2px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--mut);
+}
+
+.rg-role-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 5px;
+    border-radius: 99px;
+    background: var(--field);
+}
+
+.rg-role-btn {
+    height: 44px;
+    border: 0;
+    border-radius: 99px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--mut);
+    font: 600 15px Figtree, sans-serif;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.rg-role-btn.active {
+    background: var(--fg);
+    color: var(--bg);
+}
+
+@media (hover: hover) {
+    .rg-role-btn:not(.active):hover {
+        color: var(--fg);
+        background: var(--tint);
+    }
+}
+
+
+/* ---------- Bouton de création ---------- */
+
+.rg-submit {
+    width: 100%;
+    height: 56px;
+    border: 0;
+    border-radius: 99px;
+    cursor: pointer;
+    background: var(--fg);
+    color: var(--bg);
+    font: 700 17px "Bricolage Grotesque", sans-serif;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+
+.rg-submit:active {
+    transform: scale(0.98);
+}
+
+.rg-submit[disabled] {
+    opacity: 0.75;
+    cursor: progress;
+}
+
+.rg-spin {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2.5px solid currentColor;
+    border-right-color: transparent;
+    animation: rg-sp 0.7s linear infinite;
+    display: none;
+}
+
+.rg-submit.load .rg-spin {
+    display: block;
+}
+
+
+/* ---------- Erreur de connexion (retour API) ---------- */
+
+.rg-alert {
+    margin-top: 14px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 1.5px solid var(--err);
+    background: var(--card);
+    color: var(--err);
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+}
+
+
+/* ---------- Mentions légales ---------- */
+
+.rg-legal {
+    margin: 26px 0 0;
+    text-align: center;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--mut);
+}
+
+.rg-root .rg-legal a {
+    color: var(--fg);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+
+/* ---------- Survols (appareils avec souris uniquement) ---------- */
+
+@media (hover: hover) {
+    .rg-root .rg-new a:hover {
+        color: var(--ind2);
+    }
+    .rg-eye:hover {
+        color: var(--fg);
+        background: var(--tint);
+    }
+    .rg-submit:hover:not([disabled]) {
+        transform: translateY(-2px);
+        box-shadow: 0 16px 30px -14px rgba(20, 16, 58, 0.6);
+    }
+}
+
+
+/* ---------- Animations ---------- */
+
+@keyframes rg-in {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.98);
+    }
+}
+
+@keyframes rg-sp {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 520px) {
+    .rg-root {
+        place-items: start center;
+        padding-top: 76px;
+    }
+    .rg-card {
+        padding: 30px 22px 24px;
+        border-radius: 26px;
+        box-shadow: none;
+    }
+    .rg-title {
+        font-size: 28px;
+    }
+}
+
+
+/* ---------- Fenêtres courtes : mode compact ----------
+
+   L'inscription est le plus haut des deux formulaires jumeaux (login) :
+   trois champs, un sélecteur de rôle et une mention légale de trois lignes.
+   Sa hauteur dépasse alors la fenêtre d'environ 110 px à 360×640 et 85 px à
+   375×667, d'où le défilement de la page.
+
+   Ce bloc ne touche QUE le rythme VERTICAL : marges, hauteurs de champs,
+   hauteur du bouton. Aucune couleur, aucune police, aucun libellé, aucun
+   contenu ne change. Aucune cible ne descend sous 44 px — champs 48 px,
+   bouton 52 px, sélecteur de rôle inchangé à 44 px, bouton « œil » inchangé.
+
+   Il ne s'applique qu'à partir de 760 px de haut : au-dessus, la page
+   tenait déjà et rien ne doit bouger. Les propriétés sont écrites en
+   longhand (`padding-top` / `padding-bottom`) pour ne pas écraser les
+   marges HORIZONTALES de la carte, qui restent celles de la règle mobile. */
+
+@media (max-height: 760px) {
+    .rg-card {
+        padding-top: 26px;
+        padding-bottom: 22px;
+    }
+    .rg-logo {
+        margin-bottom: 16px;
+    }
+    .rg-title {
+        font-size: 27px;
+    }
+    .rg-new {
+        margin-bottom: 16px;
+    }
+    .rg-field {
+        margin-bottom: 10px;
+    }
+    .rg-input {
+        height: 48px;
+    }
+    .rg-role {
+        margin-top: 2px;
+        margin-bottom: 14px;
+    }
+    .rg-role-label {
+        margin-bottom: 6px;
+    }
+    .rg-submit {
+        height: 52px;
+    }
+    .rg-legal {
+        margin-top: 14px;
+        line-height: 1.45;
+    }
+}
+
+
+/* Les 76 px de décalage supérieur de la vue mobile servaient à éloigner le
+   logo du halo de `.rg-root::before`. Or ce halo est `position: fixed` : il
+   ne réclame AUCUN espace de mise en page, et le logo se trouve de toute
+   façon à l'intérieur de la carte, sur son fond opaque. Ces 44 px sont donc
+   rendus à la carte — uniquement là où ils étaient prélevés (sous 520 px de
+   large) et uniquement quand la hauteur manque vraiment : sur un grand
+   téléphone (390×844), le décalage d'origine est conservé tel quel, et
+   aucune autre page n'est concernée. */
+
+@media (max-width: 520px) and (max-height: 760px) {
+    .rg-root {
+        padding-top: 32px;
+    }
+}
+
+
+/* ---------- Mouvement réduit ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .rg-root *,
+    .rg-root *::before,
+    .rg-root *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}

@@ -127,7 +127,7 @@ export function NotificationsMenu() {
         {count > 0 && (
           <span
             className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums"
-            style={{ backgroundColor: "var(--dash-accent)", color: "#1a1200" }}
+            style={{ backgroundColor: "var(--dash-accent)", color: "var(--dash-on-accent)" }}
             aria-hidden="true"
           >
             {count > 9 ? "9+" : count}

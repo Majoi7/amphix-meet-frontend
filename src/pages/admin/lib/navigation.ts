@@ -59,13 +59,13 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Réunions",
     items: [
       {
-        to: "/dashboard/meetings",
+        to: "/dashboard/admin/meetings",
         label: "Réunions",
         description: "Toutes vos réunions : hôte, statut, durée et code.",
         Icon: Video,
       },
       {
-        to: "/dashboard/history",
+        to: "/dashboard/admin/history",
         label: "Historique",
         description: "Réunions terminées ou annulées, et séances passées.",
         Icon: History,
@@ -76,7 +76,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Personnes",
     items: [
       {
-        to: "/dashboard/users",
+        to: "/dashboard/admin/users",
         label: "Utilisateurs",
         description: "Votre compte et les personnes de vos séances.",
         Icon: Users,
@@ -87,7 +87,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Applications",
     items: [
       {
-        to: "/dashboard/applications",
+        to: "/dashboard/admin/applications",
         label: "Applications & API",
         description: "Accès programmatiques à Amphix Meet.",
         Icon: KeyRound,
@@ -98,7 +98,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Outils",
     items: [
       {
-        to: "/dashboard/mathspace",
+        to: "/dashboard/admin/mathspace",
         label: "Espace mathématique",
         description:
           "Calculs exacts, fonctions tracées et équations — sans serveur, sans table dédiée.",
@@ -110,7 +110,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Système",
     items: [
       {
-        to: "/dashboard/settings",
+        to: "/dashboard/admin/settings",
         label: "Paramètres",
         description: "Apparence de l'espace d'administration et compte.",
         Icon: Settings,
@@ -125,7 +125,7 @@ export const ALL_NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.item
 /**
  * Entrée de navigation correspondant à un chemin.
  *
- * Le tri par longueur décroissante garantit que `/dashboard/meetings` gagne
+ * Le tri par longueur décroissante garantit que `/dashboard/admin/meetings` gagne
  * sur `/dashboard` : sans cela, toutes les sous-pages porteraient le titre
  * « Tableau de bord ».
  */

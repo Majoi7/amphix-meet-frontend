@@ -1,0 +1,62 @@
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -86,16 +86,32 @@
+                 />
+
+                 {/* Espace d'administration */}
+-                <Route
+-                  path="/dashboard"
+-                  element={
+-                    <RequireAuth>
+-                      <AdminLayout />
+-                    </RequireAuth>
+-                  }
+-                >
+-                  <Route index element={<OverviewView />} />
+-                  <Route path="meetings" element={<MeetingsView />} />
+-                  <Route path="history" element={<HistoryView />} />
+-                  <Route path="users" element={<UsersView />} />
+-                  <Route
+-                    path="applications"
+-                    element={
+-                      <RequireRole role="ADMIN">
+-                        <ApplicationsView />
+-                      </RequireRole>
+-                    }
+-                  />
+-                  <Route path="mathspace" element={<MathSpaceView />} />
+-                  <Route path="settings" element={<SettingsView />} />
+-                </Route>
++                <Route
++                  path="/dashboard"
++                  element={
++                    <RequireAuth>
++                      <Home />
++                    </RequireAuth>
++                  }
++                />
++                <Route
++                  path="/dashboard/admin"
++                  element={
++                    <RequireAuth>
++                      <AdminLayout />
++                    </RequireAuth>
++                  }
++                >
++                  <Route index element={<OverviewView />} />
++                  <Route path="meetings" element={<MeetingsView />} />
++                  <Route path="history" element={<HistoryView />} />
++                  <Route path="users" element={<UsersView />} />
++                  <Route
++                    path="applications"
++                    element={
++                      <RequireRole role="ADMIN">
++                        <ApplicationsView />
++                      </RequireRole>
++                    }
++                  />
++                  <Route path="mathspace" element={<MathSpaceView />} />
++                  <Route path="settings" element={<SettingsView />} />
++                </Route>
+
+                 {/* Redirect old /settings to new location */}

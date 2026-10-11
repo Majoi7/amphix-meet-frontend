@@ -1,22 +1,78 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { ApiClientError } from "../lib/authApi";
+import "../styles/register.css";
+
+function Fox() {
+  return (
+    <svg viewBox="70 170 1070 900" aria-hidden="true">
+      <g fill="currentColor" style={{ color: "var(--ind)" }}>
+        <path d="M82 650C150 590 380 560 457 718 400 690 360 690 358 700 362 760 345 780 330 770 300 760 260 745 250 748 245 800 215 840 215 872 230 950 310 1000 388 998 260 1030 180 960 160 830 150 720 140 690 82 660Z" />
+        <path d="M370 380C372 350 420 352 480 365 540 378 590 400 620 416 650 398 690 385 714 378 750 290 820 200 870 184 920 200 970 330 978 420 1010 450 1040 490 1052 537L1118 548C1125 555 1110 575 1075 602L1112 610C1090 650 1040 700 982 738 1030 745 1055 780 1052 826 1100 860 1125 910 1120 950 1100 1020 1040 1050 980 1040 940 1030 910 1010 888 990L670 982C660 1010 600 1060 520 1050 470 1040 450 1000 460 940 470 890 510 850 540 836L485 830 512 790 450 795C470 760 490 730 500 712 490 650 495 620 497 622 420 550 372 430 370 380Z" />
+      </g>
+      <circle cx="652" cy="640" r="95" fill="#fff" />
+      <circle cx="881" cy="551" r="95" fill="#fff" />
+      <g fill="currentColor" style={{ color: "var(--ind)" }}>
+        <circle cx="677" cy="625" r="43" />
+        <circle cx="904" cy="538" r="43" />
+      </g>
+      <rect x="612" y="772" width="280" height="210" rx="42" fill="#fff" />
+      <rect x="632" y="792" width="240" height="190" rx="26" style={{ fill: "var(--ind)" }} />
+      <path
+        d="M893 825L975 782Q1002 772 1002 800V885L950 925Q950 960 990 985Q985 1000 960 992L893 960Z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export function Register() {
+  /* ---------- Logique d'inscription (inchangée) ---------- */
   const { register } = useAuth();
+
+  // Même correction que sur la connexion : `register.css` porte depuis
+  // l'origine des sélecteurs `[data-theme="dark"]` qu'aucun attribut
+  // n'atteignait. `resolved` les active, et les deux formulaires jumeaux
+  // basculent enfin ensemble, sur la même préférence que le reste de
+  // l'application.
+  const { resolved } = useTheme();
   const navigate = useNavigate();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
   const [role, setRole] = useState<"STUDENT" | "TEACHER">("STUDENT");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameBad, setNameBad] = useState(false);
+  const [emailBad, setEmailBad] = useState(false);
+  const [pwdBad, setPwdBad] = useState(false);
+
+  const nameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const pwdRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+
+    // Validate form
+    const okName = name.trim().length > 0;
+    const okEmail = EMAIL_RE.test(email.trim());
+    const okPwd = password.length >= 8;
+
+    setNameBad(!okName);
+    setEmailBad(!okEmail);
+    setPwdBad(!okPwd);
+
+    if (!okName) return nameRef.current?.focus();
+    if (!okEmail) return emailRef.current?.focus();
+    if (!okPwd) return pwdRef.current?.focus();
+
     setIsSubmitting(true);
     setError(null);
 
@@ -34,372 +90,192 @@ export function Register() {
     }
   }
 
+  /* ---------- Rendu (même design que le login) ---------- */
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-2">
-      {/* Desktop Background */}
-      <div
-        className="absolute inset-0 -z-20 hidden md:block"
-        style={{
-          backgroundImage: "url('/img1.png')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
-      />
+    <div className="rg-root" data-theme={resolved}>
+      <main className="rg-card">
+        <Link className="rg-logo" to="/">
+          <Fox />
+          Amphix Meet
+        </Link>
 
-      {/* Mobile Background */}
-      <div
-        className="absolute inset-0 -z-20 md:hidden"
-        style={{
-          backgroundImage: "url('/img2.png')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
-      />
+        <h1 className="rg-title">Créer un compte</h1>
+        <p className="rg-new">
+          Déjà un compte ? <Link to="/login">Se connecter</Link>
+        </p>
 
-      {/* Warm yellow overlay */}
-      <div className="absolute inset-0 -z-10 bg-[#E89B00]/20" />
-
-      {/* Soft dark gradient for readability */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/5 via-black/10 to-black/30" />
-
-      <div className="w-full max-w-[340px]">
-        {/* Logo */}
-        <div className="mb-2 flex flex-col items-center">
-          <div
-            className="
-              mb-2 flex h-10 w-10 items-center justify-center
-              rounded-[14px]
-              border border-white/70
-              bg-gradient-to-br from-[#FFD83D] to-[#F5A900]
-              shadow-[0_8px_24px_rgba(120,70,0,0.30)]
-              transition-all duration-300
-              hover:-translate-y-1
-              hover:rotate-3
-              hover:scale-105
-            "
-          >
-            <img
-              src="/favicon.svg"
-              alt="Amphix Meet"
-              className="h-5 w-5 object-contain"
+        <form onSubmit={handleSubmit} noValidate>
+          {/* Nom */}
+          <div className={`rg-field${nameBad ? " bad" : ""}`}>
+            <svg
+              className="rg-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" />
+            </svg>
+            <input
+              ref={nameRef}
+              id="name"
+              className="rg-input"
+              type="text"
+              name="name"
+              placeholder="Nom complet"
+              autoComplete="name"
+              required
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameBad(false);
+              }}
             />
           </div>
+          <div className="rg-msg">Entrez votre nom complet.</div>
 
-          <h1 className="text-xl font-bold tracking-tight text-white drop-shadow-lg">
-            Amphix Meet
-          </h1>
-        </div>
-
-        {/* Register Panel */}
-        <form
-          onSubmit={handleSubmit}
-          className="
-            relative overflow-hidden
-            rounded-[20px]
-            border border-white/70
-            bg-[#FFF8E7]/90
-            p-4
-            shadow-[0_16px_48px_rgba(92,55,0,0.35)]
-            backdrop-blur-2xl
-          "
-        >
-          {/* Decorative glow - top right */}
-          <div
-            className="
-              pointer-events-none absolute -right-12 -top-12
-              h-24 w-24 rounded-full
-              bg-[#FFD43B]/30
-              blur-3xl
-            "
-          />
-
-          {/* Decorative glow - bottom left */}
-          <div
-            className="
-              pointer-events-none absolute -bottom-12 -left-12
-              h-24 w-24 rounded-full
-              bg-[#F5A900]/20
-              blur-3xl
-            "
-          />
-
-          {/* Header */}
-          <div className="relative mb-3">
-            <h2 className="text-base font-bold text-[#2B2115]">
-              Créer un compte
-            </h2>
-
-            <p className="mt-0.5 text-xs text-[#765D35]">
-              Quelques informations pour commencer.
-            </p>
+          {/* E-mail */}
+          <div className={`rg-field${emailBad ? " bad" : ""}`}>
+            <svg
+              className="rg-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="5" width="18" height="14" rx="2.5" />
+              <path d="M3.5 7l8.5 6 8.5-6" />
+            </svg>
+            <input
+              ref={emailRef}
+              id="email"
+              className="rg-input"
+              type="email"
+              name="email"
+              placeholder="Adresse e-mail"
+              autoComplete="email"
+              inputMode="email"
+              required
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setEmailBad(false);
+              }}
+            />
           </div>
+          <div className="rg-msg">Entrez une adresse e-mail valide.</div>
 
-          <div className="relative space-y-2.5">
-            {/* Name */}
-            <div>
-              <label
-                htmlFor="name"
-                className="mb-1 block text-xs font-semibold text-[#3A2A16]"
-              >
-                Nom complet
-              </label>
-
-              <input
-                id="name"
-                type="text"
-                required
-                autoFocus
-                maxLength={100}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Votre nom complet"
-                className="
-                  w-full rounded-[10px]
-                  border border-gray-300
-                  bg-white
-                  px-4 py-2
-                  text-sm text-black
-                  placeholder:text-gray-400
-                  shadow-sm
-                  outline-none
-                  transition-all duration-200
-                  focus:border-gray-400
-                  focus:ring-4
-                  focus:ring-gray-900/5
-                "
-              />
-            </div>
-
-            {/* Email */}
-            <div>
-              <label
-                htmlFor="email"
-                className="mb-1 block text-xs font-semibold text-[#3A2A16]"
-              >
-                Adresse email
-              </label>
-
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ton@email.com"
-                className="
-                  w-full rounded-[10px]
-                  border border-gray-300
-                  bg-white
-                  px-4 py-2
-                  text-sm text-black
-                  placeholder:text-gray-400
-                  shadow-sm
-                  outline-none
-                  transition-all duration-200
-                  focus:border-gray-400
-                  focus:ring-4
-                  focus:ring-gray-900/5
-                "
-              />
-            </div>
-
-            {/* Password */}
-            <div>
-              <label
-                htmlFor="password"
-                className="mb-1 block text-xs font-semibold text-[#3A2A16]"
-              >
-                Mot de passe
-              </label>
-
-              <input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="
-                  w-full rounded-[10px]
-                  border border-gray-300
-                  bg-white
-                  px-4 py-2
-                  text-sm text-black
-                  placeholder:text-gray-400
-                  shadow-sm
-                  outline-none
-                  transition-all duration-200
-                  focus:border-gray-400
-                  focus:ring-4
-                  focus:ring-gray-900/5
-                "
-              />
-
-              <p className="mt-0.5 text-[10px] text-[#9A8259]">
-                8 caractères minimum
-              </p>
-            </div>
-
-            {/* Role */}
-            <div>
-              <span className="mb-1 block text-xs font-semibold text-[#3A2A16]">
-                Je suis…
-              </span>
-
-              <div
-                className="
-                  flex gap-1
-                  rounded-[10px]
-                  border border-gray-200
-                  bg-[#F7EBCF]/70
-                  p-1
-                "
-              >
-                {/* Student */}
-                <button
-                  type="button"
-                  onClick={() => setRole("STUDENT")}
-                  className={`
-                    flex-1 rounded-[8px]
-                    px-3 py-1.5
-                    text-xs font-semibold
-                    transition-all duration-200
-                    ${
-                      role === "STUDENT"
-                        ? `
-                          bg-gradient-to-r
-                          from-[#FFC928]
-                          to-[#F5A900]
-                          text-[#2B2115]
-                          shadow-[0_4px_12px_rgba(220,145,0,0.25)]
-                        `
-                        : `
-                          text-[#765D35]
-                          hover:bg-white/70
-                          hover:text-[#3A2A16]
-                        `
-                    }
-                  `}
-                >
-                  Étudiant
-                </button>
-
-                {/* Teacher */}
-                <button
-                  type="button"
-                  onClick={() => setRole("TEACHER")}
-                  className={`
-                    flex-1 rounded-[8px]
-                    px-3 py-1.5
-                    text-xs font-semibold
-                    transition-all duration-200
-                    ${
-                      role === "TEACHER"
-                        ? `
-                          bg-gradient-to-r
-                          from-[#FFC928]
-                          to-[#F5A900]
-                          text-[#2B2115]
-                          shadow-[0_4px_12px_rgba(220,145,0,0.25)]
-                        `
-                        : `
-                          text-[#765D35]
-                          hover:bg-white/70
-                          hover:text-[#3A2A16]
-                        `
-                    }
-                  `}
-                >
-                  Enseignant
-                </button>
-              </div>
-            </div>
-
-            {/* Submit */}
+          {/* Mot de passe */}
+          <div className={`rg-field${pwdBad ? " bad" : ""}`}>
+            <svg
+              className="rg-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            >
+              <rect x="4" y="10" width="16" height="10" rx="2.5" />
+              <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+            </svg>
+            <input
+              ref={pwdRef}
+              id="password"
+              className="rg-input"
+              type={showPwd ? "text" : "password"}
+              name="password"
+              placeholder="Mot de passe"
+              autoComplete="new-password"
+              required
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setPwdBad(false);
+              }}
+            />
             <button
-              type="submit"
-              disabled={isSubmitting}
-              className="
-                flex w-full items-center justify-center gap-2
-                rounded-[10px]
-                bg-gradient-to-r
-                from-[#FFC928]
-                to-[#F5A900]
-                px-6 py-2
-                text-sm font-bold
-                text-[#2B2115]
-                shadow-[0_4px_14px_rgba(220,145,0,0.30)]
-                transition-all duration-200
-                hover:-translate-y-[1px]
-                hover:from-[#FFD43B]
-                hover:to-[#FFB300]
-                hover:shadow-[0_8px_18px_rgba(220,145,0,0.40)]
-                active:translate-y-0
-                active:scale-[0.98]
-                disabled:cursor-not-allowed
-                disabled:opacity-60
-              "
+              type="button"
+              className={`rg-eye${showPwd ? " on" : ""}`}
+              aria-label={showPwd ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+              onClick={() => setShowPwd((v) => !v)}
             >
-              {isSubmitting && (
-                <Loader2 size={16} className="animate-spin" />
-              )}
-
-              {isSubmitting
-                ? "Création du compte..."
-                : "Créer mon compte"}
-            </button>
-
-            {/* Error */}
-            {error && (
-              <div
-                role="alert"
-                className="
-                  rounded-lg
-                  border border-red-200
-                  bg-red-50
-                  px-4 py-2
-                  text-center
-                  text-xs font-medium
-                  text-red-600
-                "
+              <svg
+                className="show"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                {error}
-              </div>
-            )}
+                <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <svg
+                className="off"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.4-1.1M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+              </svg>
+            </button>
           </div>
+          <div className="rg-msg">Le mot de passe doit contenir au moins 8 caractères.</div>
 
-          {/* Separator */}
-          <div className="relative my-3 flex items-center gap-3">
-            <div className="h-px flex-1 bg-[#E6D3A5]" />
-
-            <span className="text-[10px] font-medium text-[#9A8259]">
-              OU
+          {/* Choix du rôle */}
+          <div className="rg-role">
+            <span className="rg-role-label" id="role-label">
+              Je suis…
             </span>
-
-            <div className="h-px flex-1 bg-[#E6D3A5]" />
+            <div className="rg-role-group" role="group" aria-labelledby="role-label">
+              <button
+                type="button"
+                className={`rg-role-btn${role === "STUDENT" ? " active" : ""}`}
+                aria-pressed={role === "STUDENT"}
+                onClick={() => setRole("STUDENT")}
+              >
+                Étudiant
+              </button>
+              <button
+                type="button"
+                className={`rg-role-btn${role === "TEACHER" ? " active" : ""}`}
+                aria-pressed={role === "TEACHER"}
+                onClick={() => setRole("TEACHER")}
+              >
+                Enseignant
+              </button>
+            </div>
           </div>
 
-          {/* Login Link */}
-          <p className="relative text-center text-xs text-[#765D35]">
-            Déjà un compte ?{" "}
-            <Link
-              to="/login"
-              className="
-                font-bold
-                text-[#C27D00]
-                underline underline-offset-4
-                transition-colors
-                hover:text-[#8F5D00]
-              "
-            >
-              Se connecter
-            </Link>
-          </p>
+          <button
+            type="submit"
+            className={`rg-submit${isSubmitting ? " load" : ""}`}
+            disabled={isSubmitting}
+          >
+            <span className="rg-spin" />
+            <span>{isSubmitting ? "Création du compte…" : "Créer mon compte"}</span>
+          </button>
+
+          {error && (
+            <div role="alert" className="rg-alert">
+              {error}
+            </div>
+          )}
         </form>
-      </div>
+
+        <p className="rg-legal">
+          En vous inscrivant, vous acceptez les <a href="#">Conditions d’utilisation</a> et la{" "}
+          <a href="#">Politique de confidentialité</a> d’Amphix Meet.
+        </p>
+      </main>
     </div>
   );
 }

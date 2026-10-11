@@ -2,7 +2,10 @@ import { useState, useRef, type FormEvent, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Loader2, Check, Camera } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { getAvatarColor } from "../lib/avatarColor";
+import "../styles/theme.css";
+import "./profile.css";
 
 const ROLE_LABELS: Record<string, string> = {
   STUDENT: "Élève",
@@ -41,6 +44,13 @@ function resizeImageToDataUrl(file: File): Promise<string> {
 
 export function Profile() {
   const { user, updateProfile } = useAuth();
+
+  // Le profil suivait la palette sombre de la salle de réunion alors qu'il
+  // s'atteint depuis la navigation, comme l'accueil et les paramètres : il
+  // était la dernière page à ne pas suivre le thème choisi. Il lit
+  // désormais la même préférence, et la pose sur sa racine.
+  const { resolved } = useTheme();
+
   const [name, setName] = useState(user?.name ?? "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
   const [isSaving, setIsSaving] = useState(false);
@@ -100,30 +110,24 @@ export function Profile() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-meet-bg px-4 pb-16 pt-6 sm:px-6">
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-meet-blue/20 blur-[120px]" />
-        <div className="absolute right-0 top-1/3 h-80 w-80 rounded-full bg-meet-pink/10 blur-[110px]" />
-      </div>
+    <div className="app-theme pf-root" data-theme={resolved}>
+      <div className="pf-glow" aria-hidden="true" />
 
-      <div className="mx-auto w-full max-w-lg">
-        <Link
-          to="/"
-          className="mb-6 inline-flex items-center gap-1.5 text-sm text-meet-text-secondary transition-colors hover:text-meet-text-primary"
-        >
+      <div className="pf-wrap">
+        <Link to="/" className="pf-back">
           <ArrowLeft size={16} />
           Retour
         </Link>
 
-        <div className="animate-slide-up rounded-2xl border border-meet-border/60 bg-meet-bg-secondary/40 p-6 shadow-panel backdrop-blur-sm sm:p-8">
-          <div className="mb-6 flex items-center gap-4">
-            <div className="relative flex-shrink-0">
+        <div className="pf-card animate-slide-up">
+          <div className="pf-head">
+            <div className="pf-avatar-wrap">
               <div
-                className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full text-lg font-medium text-black"
+                className="pf-avatar pf-avatar-fb"
                 style={{ backgroundColor: getAvatarColor(user.id) }}
               >
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                  <img src={avatarUrl} alt="" className="pf-avatar-img" />
                 ) : (
                   initials
                 )}
@@ -133,14 +137,14 @@ export function Profile() {
                 type="file"
                 accept="image/*"
                 onChange={handlePhotoSelect}
-                className="hidden"
+                className="pf-file"
               />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isProcessingPhoto}
                 aria-label="Changer la photo de profil"
-                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-meet-blue text-white ring-2 ring-meet-bg-secondary transition-transform hover:scale-105 disabled:opacity-60"
+                className="pf-photo"
               >
                 {isProcessingPhoto ? (
                   <Loader2 size={13} className="animate-spin" />
@@ -149,19 +153,17 @@ export function Profile() {
                 )}
               </button>
             </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-medium text-meet-text-primary">
-                {user.name}
-              </h1>
-              <p className="text-sm text-meet-text-secondary">
+            <div className="pf-id">
+              <h1 className="pf-name">{user.name}</h1>
+              <p className="pf-role">
                 {ROLE_LABELS[user.role] ?? user.role} · {user.email}
               </p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="name" className="mb-1.5 block text-sm text-meet-text-secondary">
+          <form onSubmit={handleSubmit} className="pf-form">
+            <div className="pf-field">
+              <label htmlFor="name" className="pf-label">
                 Nom affiché
               </label>
               <input
@@ -170,21 +172,19 @@ export function Profile() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary px-4 py-3 text-sm text-meet-text-primary transition-all duration-200 ease-fluid focus:outline-none focus-visible:border-meet-blue focus-visible:shadow-glow focus-visible:ring-2 focus-visible:ring-meet-blue/40"
+                className="pf-input"
               />
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm text-meet-text-secondary">Email</label>
-              <div className="w-full rounded-lg border border-meet-border bg-meet-bg-secondary/50 px-4 py-3 text-sm text-meet-text-disabled">
-                {user.email}
-              </div>
+            <div className="pf-field">
+              <label className="pf-label">Email</label>
+              <div className="pf-static">{user.email}</div>
             </div>
 
             <button
               type="submit"
               disabled={isSaving || !name.trim() || isProcessingPhoto}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-meet-blue to-meet-pink bg-[length:200%_100%] bg-left px-6 py-3 text-sm font-medium text-white shadow-glow transition-all duration-300 ease-fluid hover:scale-[1.02] hover:bg-right active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
+              className="pf-submit"
             >
               {isSaving && <Loader2 size={18} className="animate-spin" />}
               {saved && !isSaving && <Check size={18} />}
@@ -192,7 +192,7 @@ export function Profile() {
             </button>
 
             {error && (
-              <p role="alert" className="animate-slide-down text-center text-sm text-meet-yellow">
+              <p role="alert" className="pf-error animate-slide-down">
                 {error}
               </p>
             )}

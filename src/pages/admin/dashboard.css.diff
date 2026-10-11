@@ -1,0 +1,30 @@
+--- a/src/pages/admin/dashboard.css
++++ b/src/pages/admin/dashboard.css
+@@ -23,6 +23,21 @@
+   * noms `--dash-*` utilisés partout ci-dessous y sont
+   * conservés sous forme d'alias, donc rien d'autre ne change ici. */
+
++.dash-root[data-theme="dark"] {
++  --dash-bg:             #0a0a0a;
++  --dash-surface:        #141414;
++  --dash-surface-2:      #1c1c1c;
++  --dash-surface-3:      #262626;
++  --dash-border:         rgba(255, 255, 255, 0.06);
++  --dash-border-strong:  rgba(255, 255, 255, 0.10);
++  --dash-accent:         #FFD83D;
++  --dash-accent-strong:  #F5A900;
++  --dash-green:          #4ade80;
++  --dash-green-soft:     rgba(74, 222, 128, 0.13);
++  --dash-blue:           #7cabff;
++  --dash-blue-soft:      rgba(124, 171, 255, 0.14);
++  --dash-red:            #f87171;
++  --dash-red-soft:       rgba(248, 113, 113, 0.13);
++  --dash-slate:          #9aa2ad;
++  --dash-slate-soft:     rgba(154, 162, 173, 0.13);
++  --dash-shadow:         0 0 0 1px rgba(255, 255, 255, 0.02);
++  --dash-shadow-lg:      0 12px 32px rgba(0, 0, 0, 0.5);
++}
++
+   .dash-root {
+     background-color: var(--dash-bg);
+     color: var(--dash-text);

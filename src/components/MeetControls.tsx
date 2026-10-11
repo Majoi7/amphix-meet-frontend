@@ -96,9 +96,22 @@ function SwirlIcon({ className = "" }: { className?: string }) {
 function HandRaiseButton({
   isHandRaised,
   onToggleHand,
+  size = "h-12 w-12",
+  iconClass = "text-[22px]",
 }: {
   isHandRaised: boolean;
   onToggleHand: () => void;
+  /**
+   * Côté du bouton. La valeur par défaut est celle de la barre mobile (48 px,
+   * le seuil tactile) : l'appel mobile n'a donc rien à préciser. La barre
+   * desktop passe une taille plus large au-delà de `lg` — les deux barres ne
+   * sont jamais rendues ensemble (`useIsMobile`), mais la valeur par défaut
+   * reste celle du mobile pour que ce soit l'appel desktop qui porte
+   * l'exception, et non le composant partagé.
+   */
+  size?: string;
+  /** Taille du pictogramme, qui suit celle du bouton. */
+  iconClass?: string;
 }) {
   return (
     <button
@@ -107,13 +120,13 @@ function HandRaiseButton({
       aria-pressed={isHandRaised}
       aria-label="Lever/baisser la main"
       title="Lever/baisser la main"
-      className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full transition-all ${
+      className={`flex ${size} flex-shrink-0 items-center justify-center rounded-full transition-all ${
         isHandRaised
           ? "bg-yellow-500 text-black hover:bg-yellow-400"
           : "bg-white/10 text-white hover:bg-white/20"
       }`}
     >
-      <Icon name="back_hand" filled={isHandRaised} className="text-[22px]" />
+      <Icon name="back_hand" filled={isHandRaised} className={iconClass} />
     </button>
   );
 }
@@ -301,9 +314,15 @@ function MobileControls({
         mise en page. En paysage sur un téléphone à encoche, les insets
         latéraux (`left`/`right`) écartent en plus les boutons du capteur.
       */}
+      {/* `max-[360px]:gap-1` : sous 360 px, l'écartement de 10 px fait
+          dépasser la rangée — les cinq commandes sont en `flex-shrink-0` et
+          totalisent 256 px, plus 8 px de marge et 32 px de padding, soit
+          336 px pour un écran de 320. Le resserrement ramène la rangée à
+          312 px, sans toucher à la taille des cibles. Au-dessus de 360 px,
+          la valeur normale s'applique. */}
       <div
         ref={barRef}
-        className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-24 items-center justify-center gap-2.5 bg-gradient-to-t from-black/70 via-black/35 to-transparent transition-transform duration-300 ease-out pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[env(safe-area-inset-bottom)] ${
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 flex h-24 items-center justify-center gap-2.5 max-[360px]:gap-1 bg-gradient-to-t from-black/70 via-black/35 to-transparent transition-transform duration-300 ease-out pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[env(safe-area-inset-bottom)] ${
           controlsVisible ? "translate-y-0" : "translate-y-full"
         }`}
       >
@@ -665,17 +684,24 @@ function DesktopControls({
       </div>
 
       <div className="pointer-events-auto flex flex-1 items-center justify-center">
-        {/* Barre principale : pilule flottante centrée, détachée du bord */}
-        <div className="flex items-center gap-1.5 rounded-[28px] border border-white/[0.06] bg-[#1e1f20]/[0.92] px-2.5 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+        {/* Barre principale : pilule flottante centrée, détachée du bord.
+
+            L'écartement et le padding ne s'élargissent qu'à partir de `lg`.
+            C'est la plus petite largeur où cette barre dispose de la place :
+            à 640 px (le seuil où `useIsMobile` bascule), les deux grappes
+            latérales de 128 px ne laissent que ~336 px au centre, alors que
+            la pilule en occupe déjà 346 — l'élargir plus tôt l'aurait fait
+            déborder. Au-delà de `lg`, le centre dispose de ~720 px. */}
+        <div className="flex items-center gap-1.5 rounded-[28px] border border-white/[0.06] bg-[#1e1f20]/[0.92] px-2.5 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.55)] backdrop-blur-xl lg:gap-2.5 lg:px-3">
         <div className="relative">
           <button
             type="button"
             onClick={() => micToggle.toggle()}
-            className={`flex h-12 w-12 items-center justify-center rounded-full text-white transition-all ${
+            className={`flex h-12 w-12 items-center justify-center rounded-full text-white transition-all lg:h-[52px] lg:w-[52px] ${
               !isMicrophoneEnabled ? "bg-[#ea4335] hover:bg-[#d33426]" : "bg-white/10 hover:bg-white/20"
             }`}
           >
-            <Icon name={isMicrophoneEnabled ? "mic" : "mic_off"} filled={isMicrophoneEnabled} className="text-[22px]" />
+            <Icon name={isMicrophoneEnabled ? "mic" : "mic_off"} filled={isMicrophoneEnabled} className="text-[22px] lg:text-[24px]" />
           </button>
           <div className="absolute -right-1 -top-1">
             <DeviceSettingsToggle
@@ -689,11 +715,11 @@ function DesktopControls({
           <button
             type="button"
             onClick={() => cameraToggle.toggle()}
-            className={`flex h-12 w-12 items-center justify-center rounded-full text-white transition-all ${
+            className={`flex h-12 w-12 items-center justify-center rounded-full text-white transition-all lg:h-[52px] lg:w-[52px] ${
               !isCameraEnabled ? "bg-[#ea4335] hover:bg-[#d33426]" : "bg-white/10 hover:bg-white/20"
             }`}
           >
-            <Icon name={isCameraEnabled ? "videocam" : "videocam_off"} filled={isCameraEnabled} className="text-[22px]" />
+            <Icon name={isCameraEnabled ? "videocam" : "videocam_off"} filled={isCameraEnabled} className="text-[22px] lg:text-[24px]" />
           </button>
           <div className="absolute -right-1 -top-1">
             <DeviceSettingsToggle
@@ -710,7 +736,7 @@ function DesktopControls({
           aria-pressed={isScreenShareEnabled}
           aria-label={isScreenShareEnabled ? "Arrêter le partage d'écran" : "Partager l'écran"}
           title={isScreenShareEnabled ? "Arrêter le partage d'écran" : "Partager l'écran"}
-          className={`flex h-12 w-12 items-center justify-center rounded-xl transition-all ${
+          className={`flex h-12 w-12 items-center justify-center rounded-xl transition-all lg:h-[52px] lg:w-[52px] ${
             isScreenShareEnabled
               ? "bg-[#a8c7fa] text-[#062e6f] hover:bg-[#bcd4fb]"
               : "bg-white/10 text-white hover:bg-white/20"
@@ -719,12 +745,19 @@ function DesktopControls({
           <Icon
             name={isScreenShareEnabled ? "stop_screen_share" : "present_to_all"}
             filled={isScreenShareEnabled}
-            className="text-[22px]"
+            className="text-[22px] lg:text-[24px]"
           />
         </button>
 
-        {/* Main levée — bouton principal à part */}
-        <HandRaiseButton isHandRaised={isHandRaised} onToggleHand={onToggleHand} />
+        {/* Main levée — bouton principal à part. Élargie à partir de `lg`,
+            comme le reste de la pilule ; la barre mobile garde la taille par
+            défaut du composant. */}
+        <HandRaiseButton
+          isHandRaised={isHandRaised}
+          onToggleHand={onToggleHand}
+          size="h-12 w-12 lg:h-[52px] lg:w-[52px]"
+          iconClass="text-[22px] lg:text-[24px]"
+        />
 
         <div className="relative">
           {showEmojiPicker && (
@@ -736,22 +769,22 @@ function DesktopControls({
           <button
             type="button"
             onClick={() => setShowEmojiPicker((v) => !v)}
-            className={`flex h-12 w-12 items-center justify-center rounded-full transition-all ${
+            className={`flex h-12 w-12 items-center justify-center rounded-full transition-all lg:h-[52px] lg:w-[52px] ${
               showEmojiPicker
                 ? "bg-yellow-500 text-black hover:bg-yellow-400"
                 : "bg-white/10 text-white hover:bg-white/20"
             }`}
           >
-            <Icon name="mood" filled={showEmojiPicker} className="text-[22px]" />
+            <Icon name="mood" filled={showEmojiPicker} className="text-[22px] lg:text-[24px]" />
           </button>
         </div>
 
         <button
           type="button"
           onClick={onLeave}
-          className="ml-1 flex h-12 w-14 items-center justify-center rounded-full bg-[#ea4335] text-white transition-all hover:bg-[#d33426]"
+          className="ml-1 flex h-12 w-14 items-center justify-center rounded-full bg-[#ea4335] text-white transition-all hover:bg-[#d33426] lg:h-[52px] lg:w-16"
         >
-          <Icon name="call_end" filled className="text-[22px]" />
+          <Icon name="call_end" filled className="text-[22px] lg:text-[24px]" />
         </button>
         </div>
       </div>
@@ -760,7 +793,7 @@ function DesktopControls({
         <button
           type="button"
           onClick={onToggleChat}
-          className={`relative flex h-11 w-11 items-center justify-center rounded-full text-white shadow-lg backdrop-blur-md ring-1 ring-white/10 transition-colors ${
+          className={`relative flex h-11 w-11 items-center justify-center rounded-full text-white shadow-lg backdrop-blur-md ring-1 ring-white/10 transition-colors lg:h-12 lg:w-12 ${
             isChatOpen ? "bg-[#a8c7fa] text-[#062e6f]" : "bg-black/45 hover:bg-black/65"
           }`}
         >
@@ -778,7 +811,7 @@ function DesktopControls({
             onClick={onToggleMore}
             aria-expanded={isMoreOpen}
             aria-label="Plus d'options"
-            className={`flex h-11 w-11 items-center justify-center rounded-full text-white shadow-lg backdrop-blur-md ring-1 ring-white/10 transition-colors ${
+            className={`flex h-11 w-11 items-center justify-center rounded-full text-white shadow-lg backdrop-blur-md ring-1 ring-white/10 transition-colors lg:h-12 lg:w-12 ${
               isMoreOpen ? "bg-black/70" : "bg-black/45 hover:bg-black/65"
             }`}
           >

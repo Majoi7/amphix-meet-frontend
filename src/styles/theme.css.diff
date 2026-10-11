@@ -1,0 +1,64 @@
+--- a/src/styles/theme.css
++++ b/src/styles/theme.css
+@@ -58,29 +58,29 @@
+   }
+
+   .app-theme[data-theme="dark"],
+   .dash-root[data-theme="dark"] {
+-    /* ---- Jetons SOMBRES ------------------------------------------------ */
+-    --app-bg: #0a0a0a;
+-    --app-surface: #141414;
+-    --app-surface-2: #1c1c1c;
+-    --app-surface-3: #262a32;
+-    --app-border: rgba(255,255,255,0.06);
+-    --app-border-strong: rgba(255,255,255,0.12);
+-
+-    --app-text: #f1f3f6;
+-    --app-text-muted: #9aa2ad;
+-    --app-text-subtle: #767e89;
+-
+-    --app-accent: #FFD83D;
+-    --app-accent-strong: #F5A900;
+-    --app-accent-soft: rgba(255, 216, 61, 0.13);
+-
+-    --app-green: #4ade80;
+-    --app-green-soft: rgba(74, 222, 128, 0.13);
+-    --app-blue: #7cabff;
+-    --app-blue-soft: rgba(124, 171, 255, 0.14);
+-    --app-red: #f87171;
+-    --app-red-soft: rgba(248, 113, 113, 0.13);
+-    --app-slate: #9aa2ad;
+-    --app-slate-soft: rgba(154, 162, 173, 0.13);
+-
+-    --app-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02);
+-    --app-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
++    /* ---- Jetons SOMBRES ------------------------------------------------ */
++    --app-bg: #0d0e11;
++    --app-surface: #16181d;
++    --app-surface-2: #1d2027;
++    --app-surface-3: #262a32;
++    --app-border: #272b33;
++    --app-border-strong: #3a3f49;
++
++    --app-text: #f1f3f6;
++    --app-text-muted: #9aa2ad;
++    --app-text-subtle: #767e89;
++
++    --app-accent: #ffd83d;
++    --app-accent-strong: #ffd83d;
++    --app-accent-soft: rgba(255, 216, 61, 0.13);
++
++    --app-green: #4ade80;
++    --app-green-soft: rgba(74, 222, 128, 0.13);
++    --app-blue: #7cabff;
++    --app-blue-soft: rgba(124, 171, 255, 0.14);
++    --app-red: #f87171;
++    --app-red-soft: rgba(248, 113, 113, 0.13);
++    --app-slate: #9aa2ad;
++    --app-slate-soft: rgba(154, 162, 173, 0.13);
++
++    --app-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02);
++    --app-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+     color-scheme: dark;
+   }

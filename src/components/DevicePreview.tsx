@@ -46,7 +46,7 @@ export function DevicePreview({ displayName, avatarUrl, identity, onDeviceStateC
 
   return (
     <div className="w-full max-w-xl">
-        <div className="relative aspect-video w-full overflow-hidden rounded-tile bg-meet-tile shadow-lg">
+        <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-meet-tile shadow-lg ring-1 ring-black/10">
         {cameraEnabled ? (
           <video
             ref={videoRef}
@@ -100,8 +100,13 @@ export function DevicePreview({ displayName, avatarUrl, identity, onDeviceStateC
         </div>
       </div>
 
+      {/* Cette erreur s'affiche dans la page de pré-jonction, pas dans la
+          salle : elle prend donc le message d'erreur de cette page
+          (`.pj-error` : bordure, fond teinté et rouge de texte de
+          l'application) au lieu du `meet-yellow`, que la salle réserve au
+          partage d'écran. Le rôle `alert` est conservé. */}
       {error && (
-        <p role="alert" className="mt-3 text-sm text-meet-yellow">
+        <p role="alert" className="pj-error">
           {error}
         </p>
       )}

@@ -1,189 +1,58 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@layer base {
-  html,
-  body,
-  #root {
+html,
+body,
+#root {
     height: 100%;
-  }
-
-  /*
-    Surface de l'application de réunion.
-
-    Trois déclarations de la même propriété, du plus ancien au plus récent —
-    un navigateur ignore sans risque celles qu'il ne connaît pas :
-
-      1. `100vh`  : le repli universel.
-      2. `100dvh` : la surface réellement visible, recalculée à la rotation
-                    comme à l'ouverture du clavier. Ignorée par iOS < 15.4 et
-                    Chrome < 108.
-      3. `var(--app-height, 100dvh)` : LA valeur qui compte, écrite sur
-                    `:root` par `useViewportSize`.
-
-    Pourquoi la troisième, alors que `dvh` existe : sur un navigateur qui ne
-    connaît pas `dvh`, c'est `100vh` qui s'applique — or `100vh` vaut la PLUS
-    GRANDE hauteur possible et n'est PAS recalculé à la rotation. La boîte ne
-    changeait donc pas de taille, le `ResizeObserver` du moteur de layout
-    n'avait rien à observer, et un partage d'écran restait dimensionné pour
-    l'ancienne orientation. `dvh` seul ne suffisait pas : il faut que la
-    hauteur change réellement pour que la mesure suive.
-
-    Le repli `100dvh` de `var()` couvre le premier rendu, avant que le hook
-    n'ait écrit la variable.
-  */
-  .app-viewport {
-    height: 100vh;
-    height: 100dvh;
-    height: var(--app-height, 100dvh);
-  }
-
-  body {
-    @apply bg-meet-bg text-meet-text-primary antialiased;
-  }
-  
-  @keyframes slide-up {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 
-  /* Focus clavier visible partout — accessibilité */
-  :focus-visible {
-    outline: 2px solid theme("colors.meet.blue");
-    outline-offset: 2px;
-  }
-
-  * {
-    scrollbar-color: theme("colors.meet.control") transparent;
-    scrollbar-width: thin;
-  }
+body {
+    margin: 0;
 }
 
-@layer components {
-  /* Bouton de contrôle rond (micro, caméra, etc.) — signature visuelle de Meet */
-  .control-btn {
-    @apply flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full
-      bg-meet-control text-meet-text-primary transition-colors duration-150
-      hover:bg-meet-control-hover disabled:opacity-40 disabled:cursor-not-allowed
-      sm:h-12 sm:w-12;
-  }
-
-  .control-btn-active {
-    @apply bg-meet-red hover:bg-meet-red-hover;
-  }
-
-  .control-btn-danger {
-    @apply bg-meet-red text-white hover:bg-meet-red-hover;
-  }
-}
-.material-symbols-rounded {
-  font-variation-settings:
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
-  font-size: 20px;
-  line-height: 1;
-  user-select: none;
-}
-
-/* Icône "filled" quand le bouton est actif */
-.icon-filled {
-  font-variation-settings:
-    'FILL' 1,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
-}
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(0.6); }
-}
-
-@keyframes slide-down {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Ouverture des menus contextuels (pin, débordement) — courte et discrète */
-@keyframes menu-pop {
-  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.animate-menu-pop {
-  animation: menu-pop 120ms cubic-bezier(0.2, 0, 0, 1);
-  transform-origin: top left;
-}
-
-/* Apparition / disparition de la vignette caméra flottante */
-@keyframes self-view-in {
-  from { opacity: 0; transform: scale(0.9) translateY(6px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.animate-self-view-in {
-  animation: self-view-in 180ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-/* Bouton d'épinglage posé au centre d'une tuile.
-   Sur un appareil qui sait survoler (souris), il reste discret au repos et
-   se révèle au survol de la tuile ou au focus clavier. Sur écran tactile, où
-   le survol n'existe pas, il reste visible en permanence : c'est la seule
-   façon d'y accéder. Un simple `sm:` ne conviendrait pas — une tablette large
-   est tactile ET au-dessus du breakpoint. */
-.pin-button {
-  opacity: 1;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .pin-button {
-    opacity: 0;
-  }
-  .group:hover .pin-button,
-  .pin-button:focus-visible,
-  .pin-button.pin-button-active {
-    opacity: 1;
-  }
-}
-
-/* Barre de défilement du bandeau secondaire — fine et discrète.
-   Une barre native (~15 px) rognerait d'autant les tuiles du bandeau. */
-.strip-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-}
-.strip-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-.strip-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.strip-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.25);
-  border-radius: 999px;
-}
-.strip-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.4);
-}
-
-.animate-pulse-dot {
-  animation: pulse-dot 1.4s ease-in-out infinite;
-}
-
-.animate-slide-down {
-  animation: slide-down 0.35s ease-out;
-}
+/* Animations de la salle de réunion (déclarées dans tailwind.config.js).
+   Sous « animations réduites », elles sont neutralisées — mais SANS retirer
+   l'information : `pulse-dot` est le point d'état « connexion perdue », il
+   cesse de pulser et reste visible. Ce bloc ne concerne que les animations
+   introduites ici ; les règles existantes ne sont pas touchées. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+    .animate-slide-down,
+    .animate-self-view-in,
+    .animate-menu-pop,
+    .animate-pulse-dot {
+        animation: none;
+    }
 }
 
+/* ---- Typographie de la salle de réunion ----
 
+   LiveKit impose la sienne : dans `@livekit/components-styles`, la variable
+   `--font-family` vaut `system-ui, -apple-system, 'Segoe UI', Roboto, …`, et
+   `_preflight.scss` l'applique via `font-family: var(--font-family)` sous un
+   sélecteur `[data-theme]`. La salle est donc, dans toute l'application, la
+   seule zone qui n'hérite pas de la famille de l'application : elle rend en
+   police système, à côté de pages qui rendent en Figtree.
+
+   Le brief demande Google Sans « en priorité ». Google Sans n'est pas
+   distribuée : elle est absente de Google Fonts comme des dépendances du
+   projet, et rien ne la charge — la première entrée de la pile déclarée dans
+   `tailwind.config.js` n'a jamais été servie. La charger depuis un hôte tiers
+   supposerait de vérifier la CSP ; ce n'est pas fait ici, et AUCUNE requête
+   réseau n'est ajoutée. Roboto n'est pas téléchargée non plus : elle n'est
+   nommée que comme repli, pour les systèmes qui la possèdent déjà.
+
+   La pile retenue est donc celle de l'application — Figtree d'abord, chargée
+   par `theme.css` et déjà posée sur l'accueil, le profil et le pré-join —
+   puis Roboto, puis la pile système. On définit la variable ET la propriété :
+   la variable pour que les composants LiveKit qui s'en servent la lisent, la
+   propriété pour l'élément porteur lui-même.
+
+   `.app-viewport[data-lk-theme="default"]` (0,2,0) l'emporte sur le
+   `[data-theme]` de LiveKit (0,1,0), quel que soit l'ordre de chargement. Le
+   sélecteur ne peut viser que la salle : `.app-viewport` n'existe nulle part
+   ailleurs. */
+.app-viewport[data-lk-theme="default"] {
+    --font-family: Figtree, Roboto, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    font-family: Figtree, Roboto, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
