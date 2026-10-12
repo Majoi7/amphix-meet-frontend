@@ -286,7 +286,8 @@
     transition: transform .2s, box-shadow .2s, opacity .2s;
 }
 
-.hm-btn-primary:disabled {
+.hm-btn-primary:disabled,
+.hm-btn-secondary:disabled {
     opacity: .6;
     cursor: progress;
 }
@@ -317,6 +318,28 @@
 
 .hm-btn-secondary svg {
     color: var(--app-accent-strong);
+}
+
+/* Tableau blanc : le bouton et la note qui l'accompagne.
+
+   La note est un bloc à part entière pour que `.hm-actions` continue de
+   séparer ses grandes actions par 12 px — c'est le `gap` de `.hm-board`
+   (6 px) qui resserre la note contre SON bouton, et non contre le suivant.
+
+   Le libellé de la note peut contenir le titre d'une réunion, choisi par
+   l'utilisateur : rien n'en borne la longueur, elle se replie donc sur
+   plusieurs lignes plutôt que de déborder. */
+.hm-board {
+    display: grid;
+    gap: 6px;
+}
+
+.hm-board-note {
+    padding: 0 22px;
+    font-size: 12.5px;
+    line-height: 1.45;
+    text-align: center;
+    color: var(--app-text-muted);
 }
 
 .hm-join {

@@ -8,7 +8,11 @@
  * unique renvoyant un `number` rendrait la seconde passe impossible.
  */
 
-export type BinaryOperator = "+" | "-" | "*" | "/" | "^";
+/** `%` est le reste de la division euclidienne, à la précédence de `*` et
+ *  `/`. Sa définition exacte est dans `numeric.ts` et `exact.ts`, qui doivent
+ *  rester d'accord : un écart entre les deux ferait diverger la forme exacte
+ *  et l'approximation d'un même calcul. */
+export type BinaryOperator = "+" | "-" | "*" | "/" | "%" | "^";
 export type UnaryOperator = "+" | "-";
 
 export type MathFunctionName =

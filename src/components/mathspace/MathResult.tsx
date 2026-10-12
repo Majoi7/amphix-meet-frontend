@@ -146,7 +146,7 @@ export function MathResult({
           className="px-4 pb-3 pt-1 text-[11.5px] leading-snug"
           style={{ color: "var(--app-text-subtle)" }}
         >
-          Le moteur fournit la forme exacte pour les rationnels ( + − × ÷ ^ ) et pour
+          Le moteur fournit la forme exacte pour les rationnels ( + − × ÷ % ^ ) et pour
           les racines de carrés parfaits. Pour les autres nombres — π, e, √2 — seule
           l&apos;approximation existe, et elle est annoncée comme telle.
         </p>

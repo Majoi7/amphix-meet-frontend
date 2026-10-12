@@ -11,7 +11,7 @@ import { MathError } from "./errors";
  * est incapable de produire sans un moteur symbolique complet).
  *
  * Ce qui est réellement exact ici :
- *   +  -  ×  ÷  ^(entier)  !         sur des rationnels
+ *   +  -  ×  ÷  mod  ^(entier)  !    sur des rationnels
  *   sqrt d'un carré parfait (y compris une fraction de carrés parfaits)
  *   abs, sign, floor, ceil, round, trunc
  *
@@ -205,11 +205,18 @@ export function evaluateExact(node: MathNode, x: Rational | null = null): Ration
       const left = evaluateExact(node.left, x);
       const right = evaluateExact(node.right, x);
       if (left === null || right === null) {
-        // Une division par un zéro EXACT reste fautive, même si l'autre
-        // opérande n'a pas de forme exacte : on veut « Division par zéro
-        // impossible », pas « forme exacte non disponible ».
-        if (node.operator === "/" && right !== null && right.n === 0n) {
-          throw new MathError("DIVISION_BY_ZERO", "Division par zéro impossible.");
+        // Une division — ou un modulo — par un zéro EXACT reste fautive, même
+        // si l'autre opérande n'a pas de forme exacte : on veut « Division par
+        // zéro impossible », pas « forme exacte non disponible ».
+        if (
+          (node.operator === "/" || node.operator === "%") &&
+          right !== null &&
+          right.n === 0n
+        ) {
+          throw new MathError(
+            "DIVISION_BY_ZERO",
+            node.operator === "%" ? "Modulo par zéro impossible." : "Division par zéro impossible."
+          );
         }
         return null;
       }
@@ -223,6 +230,17 @@ export function evaluateExact(node: MathNode, x: Rational | null = null): Ration
           return multiply(left, right);
         case "/":
           return divide(left, right);
+        case "%": {
+          if (right.n === 0n) {
+            throw new MathError("DIVISION_BY_ZERO", "Modulo par zéro impossible.");
+          }
+          // `a mod b = a − b·⌊a/b⌋`, la définition de `numeric.ts`, écrite ici
+          // en rationnels. `floorDivide` arrondit déjà vers le bas, y compris
+          // pour un quotient négatif — c'est ce qui rend `-7 mod 3` égal à 2
+          // et non à -1.
+          const quotient = floorDivide(left.n * right.d, left.d * right.n);
+          return subtract(left, multiply(right, make(quotient, 1n)));
+        }
         case "^": {
           if (!isInteger(right)) return null;
           return integerPower(left, Number(right.n));

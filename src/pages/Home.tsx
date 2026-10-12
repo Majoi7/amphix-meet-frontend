@@ -15,6 +15,7 @@ import {
   Settings,
   User,
   Inbox,
+  Pencil,
   LayoutDashboard,
 } from "lucide-react";
 import { createMeeting, listMyMeetings, type MeetingListItem } from "../lib/meetingApi";
@@ -82,6 +83,14 @@ export function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  /**
+   * État PROPRE au bouton « Tableau blanc ».
+   *
+   * Il ne partage pas `isCreating` avec « Nouvelle réunion instantanée » :
+   * les deux boutons lancent des appels réseau distincts, et un compteur
+   * commun afficherait la roue de l'un pendant que l'autre travaille.
+   */
+  const [isOpeningBoard, setIsOpeningBoard] = useState(false);
 
   function refreshBookings() {
     listMyBookings()
@@ -156,6 +165,44 @@ export function Home() {
 
   const activeMeetings = meetings.filter((m) => m.status === "IN_PROGRESS");
   const pastMeetings = meetings.filter((m) => m.status === "COMPLETED");
+
+  /**
+   * Réunion en cours dans laquelle ouvrir le tableau blanc, s'il y en a une.
+   *
+   * `activeMeetings` vient de `listMyMeetings()` : ce sont des réunions où
+   * l'utilisateur est hôte ou participant — il peut donc les rejoindre. On
+   * prend la PREMIÈRE, celle-là même que la colonne « En cours » affiche en
+   * tête : ce que la note sous le bouton annonce est exactement ce qui se
+   * produira.
+   */
+  const boardMeeting = activeMeetings[0] ?? null;
+
+  /**
+   * Ouvre le tableau blanc.
+   *
+   * Le tableau blanc n'existe QUE dans une salle LiveKit : on ne monte donc
+   * jamais `Whiteboard` ici, et on ne crée aucun second tableau. On entre dans
+   * une salle — celle d'une réunion déjà en cours si l'utilisateur en a une,
+   * sinon une réunion qu'on crée — et on demande à `Room` de l'ouvrir à
+   * l'arrivée avec `?whiteboard=1`. `Room` retire ce paramètre de l'URL dès
+   * qu'il l'a lu : le parcours PreJoin reste donc intact, et ni la fermeture du
+   * tableau ni un rechargement de page ne le rouvrent.
+   */
+  async function handleOpenWhiteboard() {
+    setIsOpeningBoard(true);
+    setError(null);
+    try {
+      if (boardMeeting) {
+        navigate(`/room/${boardMeeting.joinCode}?whiteboard=1`);
+        return;
+      }
+      const { roomId } = await createMeeting();
+      navigate(`/room/${roomId}?whiteboard=1`);
+    } catch {
+      setError("Impossible d'ouvrir le tableau blanc. Vérifie que le serveur est démarré.");
+      setIsOpeningBoard(false);
+    }
+  }
 
   const pendingReceivedBookings = bookings.filter(
     (b) => b.status === "PENDING" && b.createdById !== user?.id
@@ -278,6 +325,27 @@ export function Home() {
               <CalendarPlus size={20} />
               <span>Réserver une séance</span>
             </button>
+
+            {/* Tableau blanc — même recette que « Réserver une séance » : le
+                dégradé reste réservé à l'action première de la page. La note
+                dit dans QUOI le tableau va s'ouvrir ; sans elle, l'utilisateur
+                atterrirait dans une salle sans comprendre d'où elle vient. */}
+            <div className="hm-board">
+              <button
+                type="button"
+                onClick={handleOpenWhiteboard}
+                disabled={isOpeningBoard}
+                className="hm-btn-secondary"
+              >
+                {isOpeningBoard ? <Loader2 size={20} className="hm-spin" /> : <Pencil size={20} />}
+                <span>Tableau blanc</span>
+              </button>
+              <p className="hm-board-note">
+                {boardMeeting
+                  ? `S'ouvrira dans « ${boardMeeting.title} », en cours.`
+                  : "Une nouvelle réunion sera créée pour l'accueillir."}
+              </p>
+            </div>
 
             <form onSubmit={handleJoin} className="hm-join">
               <input

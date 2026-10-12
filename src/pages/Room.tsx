@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   LiveKitRoom,
   useParticipants,
@@ -85,6 +85,7 @@ interface ConnectionInfo {
 export function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   // Source de vérité UNIQUE de la hauteur de la surface, montée au sommet de
   // la page : elle couvre l'avant-réunion comme la réunion elle-même, et
   // c'est elle qui garantit que la boîte change VRAIMENT de taille à la
@@ -98,6 +99,39 @@ export function RoomPage() {
   const [waitingLobbyId, setWaitingLobbyId] = useState<string | null>(null);
   const hadErrorRef = useRef(false);
   const pendingPrefsRef = useRef<DevicePreferences | null>(null);
+
+  /**
+   * Demande d'ouverture du tableau blanc à l'arrivée.
+   *
+   * Posée par le bouton « Tableau blanc » du dashboard, sous la forme
+   * `/room/<code>?whiteboard=1`.
+   *
+   * Elle est lue UNE SEULE FOIS, dans l'initialiseur de `useState` : la valeur
+   * est donc figée au montage et ne peut plus changer ensuite. C'est ce qui
+   * garantit que fermer le tableau ne le rouvre pas au rendu suivant — un
+   * `useState(searchParams.get(...))` recalculé à chaque rendu produirait
+   * exactement ce défaut.
+   *
+   * Le tableau ne s'ouvre pas ICI : il appartient à `MeetingLayout`, qui
+   * n'existe qu'une fois la connexion LiveKit établie. Le parcours PreJoin
+   * reste donc traversé normalement, avec ses contrôles micro/caméra.
+   */
+  const [openWhiteboardOnArrival] = useState(() => searchParams.get("whiteboard") === "1");
+
+  /**
+   * Le paramètre est RETIRÉ de l'URL dès qu'il a été lu — en remplacement, donc
+   * sans entrée d'historique.
+   *
+   * C'est la seconde moitié de la garantie : une fois retiré, un rechargement
+   * de la page ne le rejoue plus. La condition de sortie rend la boucle
+   * impossible — après le premier passage, `whiteboard` n'est plus là.
+   */
+  useEffect(() => {
+    if (!searchParams.has("whiteboard")) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("whiteboard");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleJoin = useCallback(
     async (prefs: DevicePreferences) => {
@@ -266,6 +300,7 @@ export function RoomPage() {
           isHost={connection.isHost}
           endsAt={connection.endsAt}
           onExitRoom={exitRoom}
+          openWhiteboardOnArrival={openWhiteboardOnArrival}
         />
       </ToastProvider>
       <RoomAudioRenderer />
@@ -280,9 +315,24 @@ interface MeetingLayoutProps {
   endsAt: string | null;
   /** Libère la salle (navigation, nettoyage) — ne joue aucun son. */
   onExitRoom: () => void;
+  /**
+   * Le tableau blanc doit-il être ouvert dès l'entrée dans la salle ?
+   *
+   * Vient du paramètre d'URL `?whiteboard=1` (bouton « Tableau blanc » du
+   * dashboard), lu et consommé par `RoomPage`. Il ne sert que de valeur
+   * INITIALE : une fois `MeetingLayout` monté, c'est `isWhiteboardOpen` qui
+   * fait foi, et refermer le tableau ne le rouvre pas.
+   */
+  openWhiteboardOnArrival: boolean;
 }
 
-function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProps) {
+function MeetingLayout({
+  roomId,
+  isHost,
+  endsAt,
+  onExitRoom,
+  openWhiteboardOnArrival,
+}: MeetingLayoutProps) {
   const [panel, setPanel] = useState<PanelState>("none");
   // « Plus d'options » (menu desktop, feuille mobile) est piloté d'ICI, à
   // côté de `panel` : deux états voisins, dans le même composant, ne peuvent
@@ -290,7 +340,11 @@ function MeetingLayout({ roomId, isHost, endsAt, onExitRoom }: MeetingLayoutProp
   // d'état que rien ne reliait au panneau ouvert.
   const [moreOpen, setMoreOpen] = useState(false);
   const [lastReadCount, setLastReadCount] = useState(0);
-  const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
+  // Ouverture directe sur le tableau blanc quand on arrive avec
+  // `?whiteboard=1`. La prop ne sert que d'état INITIAL : ensuite, seul
+  // `setIsWhiteboardOpen` fait autorité — c'est ce qui empêche le tableau de
+  // se rouvrir tout seul après avoir été refermé.
+  const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(openWhiteboardOnArrival);
   const [meetingStartTime] = useState(() => Date.now());
   const [controlsVisible, setControlsVisible] = useState(true);
   /**

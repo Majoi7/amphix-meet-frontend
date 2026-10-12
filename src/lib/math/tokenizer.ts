@@ -28,7 +28,7 @@ export interface Token {
   start: number;
 }
 
-const OPERATORS = "+-*/^!";
+const OPERATORS = "+-*/^!%";
 
 /**
  * Écritures typographiques d'un opérateur, ramenées à leur forme ASCII.
@@ -111,6 +111,16 @@ export function tokenize(input: string): Token[] {
       while (i < input.length && isLetter(input[i])) i++;
       const raw = input.slice(start, i);
       tokens.push({ type: "identifier", value: raw.toLowerCase(), raw, start });
+      continue;
+    }
+
+    // Racine carrée en notation préfixée : « √9 ». Le parseur en fait un appel
+    // à `sqrt`, si bien que les évaluateurs n'ont rien à apprendre de ce signe.
+    // Il est accepté pour la même raison que « × » et « ÷ » : on le colle ou on
+    // le tape, il ne doit pas ressortir en « Caractère inattendu ».
+    if (c === "√") {
+      tokens.push({ type: "operator", value: "√", raw: c, start: i });
+      i++;
       continue;
     }
 

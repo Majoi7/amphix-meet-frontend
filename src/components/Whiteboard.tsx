@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
+  Calculator,
   Circle as CircleIcon,
+  CopyPlus,
   Eraser,
   Eye,
   EyeOff,
@@ -13,12 +15,19 @@ import {
   Redo2,
   Sigma,
   Share2,
+  Sparkles,
   Square,
   Trash2,
   Undo2,
 } from "lucide-react";
 import { useDataChannel, useLocalParticipant } from "@livekit/components-react";
+import { getAiStatus } from "../lib/aiApi";
 import { getWhiteboard, saveWhiteboard } from "../lib/whiteboardApi";
+import {
+  copyStrokes,
+  hasClipboardContent,
+  readClipboardForPaste,
+} from "../lib/whiteboardClipboard";
 import {
   boundsIntersect,
   findStrokeAt,
@@ -27,6 +36,10 @@ import {
   strokeTouchTolerance,
 } from "../lib/whiteboardHitTest";
 import { MathPanel } from "./MathPanel";
+import { AiPanel } from "./whiteboard/AiPanel";
+import { ColorPalette } from "./whiteboard/ColorPalette";
+import { ContextMenu, type ContextMenuItem } from "./whiteboard/ContextMenu";
+import { MiniCalculator } from "./whiteboard/MiniCalculator";
 import type {
   WhiteboardCamera,
   WhiteboardData,
@@ -121,12 +134,37 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
   const [width, setWidth] = useState(WIDTHS[1]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isMathPanelOpen, setIsMathPanelOpen] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [camera, setCamera] = useState<WhiteboardCamera>(DEFAULT_CAMERA);
   const [isZen, setIsZen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Position du menu contextuel, en coordonnées viewport. `null` = fermé.
+  const [contextMenuAt, setContextMenuAt] = useState<{ x: number; y: number } | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [shareStream, setShareStream] = useState<MediaStream | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
+  // L'assistant n'est proposé que si le serveur dit qu'il est utilisable.
+  // `AI_ENABLED` vaut faux par défaut côté backend : sans cette question, le
+  // bouton serait là pour ne rien faire, et l'échec ne se découvrirait qu'au
+  // clic. La route interrogée n'appelle pas le fournisseur — aucun quota.
+  const [isAiReady, setIsAiReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAiStatus()
+      .then((status) => {
+        if (!cancelled) setIsAiReady(status.enabled && status.configured);
+      })
+      .catch(() => {
+        // Serveur injoignable ou session expirée : on n'affiche pas un bouton
+        // dont on ne peut pas garantir qu'il fonctionne.
+        if (!cancelled) setIsAiReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleShareScreen = useCallback(async () => {
     // Prevent multiple clicks while publishing
@@ -470,12 +508,54 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
     return () => canvas.removeEventListener("wheel", handleWheel);
   }, []);
 
-  // Suppression de la sélection au clavier.
+  // Raccourcis clavier du tableau : suppression, et presse-papiers.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size > 0) {
-        const target = e.target as HTMLElement;
-        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      const target = e.target as HTMLElement;
+      // Jamais depuis un champ de saisie. La palette de couleurs (saisie HEX)
+      // et le panneau mathématique ont leurs propres champs : `Ctrl+C` y doit
+      // rester un copier de texte, pas un copier de traits. Le test est fait
+      // une fois pour tous les raccourcis, y compris Suppr.
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+
+      // `Ctrl+D` (marque-page) et `Ctrl+C` (copie de la page) ont une action
+      // propre au navigateur : elle n'est neutralisée QUE si le tableau a
+      // réellement quelque chose à faire, pour ne pas rendre ces raccourcis
+      // inutilisables quand rien n'est sélectionné.
+      if (mod && key === "c") {
+        if (selectedIds.size === 0) return;
+        e.preventDefault();
+        handleCopySelection();
+        return;
+      }
+      if (mod && key === "x") {
+        if (selectedIds.size === 0) return;
+        e.preventDefault();
+        handleCutSelection();
+        return;
+      }
+      if (mod && key === "v") {
+        if (!hasClipboardContent()) return;
+        e.preventDefault();
+        pasteFromClipboard();
+        return;
+      }
+      if (mod && key === "d") {
+        if (selectedIds.size === 0) return;
+        e.preventDefault();
+        handleDuplicateSelection();
+        return;
+      }
+      if (!mod && (e.key === "Delete" || e.key === "Backspace") && selectedIds.size > 0) {
         e.preventDefault();
         handleDeleteSelection();
       }
@@ -485,7 +565,9 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIds, strokes]);
 
-  function getScreenPoint(e: React.PointerEvent<HTMLCanvasElement>) {
+  // Le type est structurel : les gestionnaires de pointeur ET de menu
+  // contextuel passent par ici, et seules `clientX` / `clientY` sont lues.
+  function getScreenPoint(e: { clientX: number; clientY: number }) {
     const rect = canvasRef.current!.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
@@ -530,6 +612,20 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    // Le bouton droit n'agit jamais sur le tableau : il ouvre le menu
+    // contextuel (`onContextMenu`). Sans ce garde, un clic droit agirait
+    // AUSSI — déplacement du trait visé en mode sélection, ou lancement d'un
+    // rectangle de sélection sur le vide.
+    if (e.button === 2) return;
+
+    // Un menu contextuel ouvert absorbe le premier clic : il se referme sans
+    // agir. Sans ce garde, refermer le menu au bouton gauche déposerait un
+    // point sur le tableau — le clic ferait les deux.
+    if (contextMenuAt) {
+      setContextMenuAt(null);
+      return;
+    }
+
     e.currentTarget.setPointerCapture(e.pointerId);
     const screenPoint = getScreenPoint(e);
     const worldPoint = screenToWorld(screenPoint, camera);
@@ -778,6 +874,129 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
     setSelectedIds(new Set());
   }
 
+  /* ─── Presse-papiers ───────────────────────────────────────────────
+     Aucune de ces fonctions ne touche au modèle de données, au canal de
+     synchronisation ni à l'historique : elles réutilisent `commitStrokes`
+     (ajout + un pas d'historique + une diffusion par trait) et
+     `handleDeleteSelection` (message `remove`), qui existaient déjà. */
+  function selectedStrokes(): WhiteboardStroke[] {
+    return strokesRef.current.filter((stroke) => selectedIds.has(stroke.id));
+  }
+
+  /** Copie la sélection. Renvoie le nombre de traits copiés (0 = rien). */
+  function handleCopySelection(): number {
+    return copyStrokes(selectedStrokes());
+  }
+
+  function handleCutSelection(): void {
+    if (handleCopySelection() === 0) return;
+    handleDeleteSelection();
+  }
+
+  /**
+   * Colle le presse-papiers.
+   *
+   * Chaque trait reçoit un identifiant NEUF, et c'est la condition même de la
+   * « duplication sans doublon chez les autres participants » demandée : un
+   * client ignore un message `stroke` dont l'identifiant est déjà connu.
+   * Recoller les identifiants d'origine afficherait donc la copie chez celui
+   * qui colle — et nulle part ailleurs.
+   *
+   * L'auteur devient le participant courant : c'est bien lui qui vient de
+   * créer ces traits.
+   *
+   * `commitStrokes` regroupe le tout en UN pas d'historique — un seul Ctrl+Z
+   * retire l'ensemble du collage — et diffuse depuis la fonction, jamais
+   * depuis un updater `setState` (voir la note de `handlePointerUp` : le mode
+   * strict exécuterait l'updater deux fois, donc enverrait deux fois le
+   * message).
+   */
+  function pasteFromClipboard(): number {
+    const pasted = readClipboardForPaste().map((stroke) => ({
+      ...stroke,
+      id: crypto.randomUUID(),
+      authorId: localParticipant.identity,
+    }));
+    if (pasted.length === 0) return 0;
+
+    commitStrokes(pasted);
+    // La copie devient la sélection : elle se déplace et s'efface aussitôt,
+    // comme dans n'importe quel éditeur.
+    setSelectedIds(new Set(pasted.map((stroke) => stroke.id)));
+    // L'outil de sélection, sans quoi la copie serait sélectionnée sans
+    // pouvoir être manipulée — et le prochain glissement dessinerait.
+    setTool("select");
+    return pasted.length;
+  }
+
+  function handleDuplicateSelection(): void {
+    if (handleCopySelection() === 0) return;
+    pasteFromClipboard();
+  }
+
+  /* ─── Menu contextuel ────────────────────────────────────────────── */
+
+  function handleContextMenu(e: React.MouseEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    const hit = findStrokeAt(
+      strokesRef.current,
+      screenToWorld(getScreenPoint(e), camera),
+      camera.zoom
+    );
+    // Un clic droit sur un trait non sélectionné le sélectionne : c'est le
+    // comportement attendu partout ailleurs, et sans lui « Copier » viserait
+    // une sélection invisible.
+    if (hit && !selectedIds.has(hit.id)) {
+      setSelectedIds(new Set([hit.id]));
+      setTool("select");
+    }
+    setContextMenuAt({ x: e.clientX, y: e.clientY });
+  }
+
+  function contextMenuItems(): ContextMenuItem[] {
+    const hasSelection = selectedIds.size > 0;
+    return [
+      {
+        id: "copy",
+        label: "Copier",
+        shortcut: "Ctrl+C",
+        disabled: !hasSelection,
+        onSelect: () => {
+          handleCopySelection();
+        },
+      },
+      {
+        id: "cut",
+        label: "Couper",
+        shortcut: "Ctrl+X",
+        disabled: !hasSelection,
+        onSelect: handleCutSelection,
+      },
+      {
+        id: "paste",
+        label: "Coller",
+        shortcut: "Ctrl+V",
+        disabled: !hasClipboardContent(),
+        onSelect: pasteFromClipboard,
+      },
+      {
+        id: "duplicate",
+        label: "Dupliquer",
+        shortcut: "Ctrl+D",
+        disabled: !hasSelection,
+        onSelect: handleDuplicateSelection,
+      },
+      {
+        id: "delete",
+        label: "Supprimer",
+        shortcut: "Suppr",
+        disabled: !hasSelection,
+        danger: true,
+        onSelect: handleDeleteSelection,
+      },
+    ];
+  }
+
   function handleRecenter() {
     setCamera(DEFAULT_CAMERA);
   }
@@ -830,22 +1049,27 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
           <ToolButton active={isMathPanelOpen} onClick={() => setIsMathPanelOpen((v) => !v)} label="Fonction f(x)">
             <Sigma size={16} />
           </ToolButton>
+          <ToolButton
+            active={isCalculatorOpen}
+            onClick={() => setIsCalculatorOpen((v) => !v)}
+            label="Calculatrice"
+          >
+            <Calculator size={16} />
+          </ToolButton>
+          {isAiReady && (
+            <ToolButton
+              active={isAiPanelOpen}
+              onClick={() => setIsAiPanelOpen((v) => !v)}
+              label="Assistant"
+            >
+              <Sparkles size={16} />
+            </ToolButton>
+          )}
 
           {isDrawingTool && (
             <>
               <div className="mx-1 h-6 w-px bg-meet-border" />
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  aria-label={`Couleur ${c}`}
-                  className={`h-6 w-6 flex-shrink-0 rounded-full ring-2 transition-transform ${
-                    color === c ? "scale-110 ring-meet-text-primary" : "ring-transparent"
-                  }`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
+              <ColorPalette color={color} baseColors={COLORS} onChange={setColor} />
               <div className="mx-1 h-6 w-px bg-meet-border" />
               {WIDTHS.map((w) => (
                 <button
@@ -872,9 +1096,14 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
             <Redo2 size={16} />
           </ToolButton>
           {selectedIds.size > 0 && (
-            <ToolButton onClick={handleDeleteSelection} label="Supprimer la sélection">
-              <Trash2 size={16} />
-            </ToolButton>
+            <>
+              <ToolButton onClick={handleDuplicateSelection} label="Dupliquer la sélection">
+                <CopyPlus size={16} />
+              </ToolButton>
+              <ToolButton onClick={handleDeleteSelection} label="Supprimer la sélection">
+                <Trash2 size={16} />
+              </ToolButton>
+            </>
           )}
           {isHost && (
             <>
@@ -972,15 +1201,30 @@ export function Whiteboard({ roomId, isHost, onClose }: WhiteboardProps) {
             onClose={() => setIsMathPanelOpen(false)}
           />
         )}
+        {isCalculatorOpen && !isZen && (
+          <MiniCalculator onClose={() => setIsCalculatorOpen(false)} />
+        )}
+        {isAiPanelOpen && isAiReady && !isZen && (
+          <AiPanel onClose={() => setIsAiPanelOpen(false)} />
+        )}
         <canvas
           ref={canvasRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
+          onContextMenu={handleContextMenu}
           className="absolute inset-0 h-full w-full touch-none"
           style={{ cursor: tool === "pan" ? "grab" : tool === "select" ? "default" : "crosshair" }}
         />
+        {contextMenuAt && (
+          <ContextMenu
+            x={contextMenuAt.x}
+            y={contextMenuAt.y}
+            items={contextMenuItems()}
+            onClose={() => setContextMenuAt(null)}
+          />
+        )}
       </div>
     </div>
   );

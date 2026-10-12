@@ -37,6 +37,23 @@ function factorial(n: number, strict: boolean): number {
   return result;
 }
 
+/**
+ * Reste de la division euclidienne — et NON le `%` de JavaScript.
+ *
+ * `-7 % 3` vaut 2 ici, contre -1 en JavaScript : le reste prend le signe du
+ * DIVISEUR, ce qui est la définition enseignée. Pour un diviseur positif, le
+ * résultat est donc toujours positif ou nul.
+ *
+ * `exact.ts` implémente la même définition ; les deux DOIVENT rester d'accord,
+ * sinon la forme exacte et l'approximation d'un même calcul divergeraient.
+ *
+ * Hors mode strict, un diviseur nul donne `NaN` par propagation — le tracé a
+ * besoin des valeurs IEEE telles quelles, comme pour les autres opérateurs.
+ */
+function flooredModulo(dividend: number, divisor: number): number {
+  return dividend - divisor * Math.floor(dividend / divisor);
+}
+
 function guardDomain(condition: boolean, message: string, strict: boolean): void {
   if (condition && strict) throw new MathError("OUT_OF_DOMAIN", message);
 }
@@ -133,6 +150,16 @@ export function evaluateNumeric(node: MathNode, x: number, strict: boolean): num
           throw new MathError("DIVISION_BY_ZERO", "Division par zéro impossible.");
         }
         return left / right;
+      }
+
+      // Ce test doit précéder le repli sur `Math.pow` ci-dessous : sans lui,
+      // `5%2` serait silencieusement calculé comme `5^2`. Un résultat faux
+      // affiché sans avertissement est le pire des défauts possibles ici.
+      if (node.operator === "%") {
+        if (right === 0 && strict) {
+          throw new MathError("DIVISION_BY_ZERO", "Modulo par zéro impossible.");
+        }
+        return flooredModulo(left, right);
       }
 
       const powered = Math.pow(left, right);

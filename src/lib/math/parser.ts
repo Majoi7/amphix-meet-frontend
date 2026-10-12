@@ -15,16 +15,21 @@ import { tokenize, type Token } from "./tokenizer";
  *
  *   expression  := somme
  *   somme       := produit (('+' | '-') produit)*
- *   produit     := unaire (('*' | '/' | IMPLICITE) unaire)*
- *   unaire      := ('-' | '+') unaire | puissance
+ *   produit     := unaire (('*' | '/' | '%' | IMPLICITE) unaire)*
+ *   unaire      := ('-' | '+' | '√') unaire | puissance
  *   puissance   := suffixe ('^' unaire)?          // right-associatif
  *   suffixe     := primaire '!'*
  *   primaire    := nombre | identifiant | '(' somme ')'
  *
- * Deux ajouts par rapport à l'ancien moteur, tous deux réels :
+ * Quatre ajouts par rapport à l'ancien moteur, tous réels :
  *  - la MULTIPLICATION IMPLICITE : `2x`, `2(x+1)`, `x(x+1)`, `2pi`, `3sin(x)`.
  *    Elle a la précédence de `*`, donc `2x^2` vaut `2*(x^2)`.
  *  - la FACTORIELLE postfixée : `5!`.
+ *  - le MODULO `%`, à la précédence de `*` et `/`.
+ *  - la RACINE PRÉFIXÉE `√`, qui produit un appel à `sqrt` : `√9` vaut 3,
+ *    `√9+1` vaut 4 (le signe ne porte que sur l'opérande suivant), et
+ *    `2√9` vaut 6 (la multiplication implicite l'accepte comme opérande — sans
+ *    quoi la notation la plus naturelle du collège serait refusée).
  */
 
 const CONSTANTS: Record<string, MathConstantName> = {
@@ -61,6 +66,9 @@ const FUNCTIONS: Record<string, MathFunctionName> = {
 /** Noms connus mais volontairement non implémentés : le message le dit,
  *  plutôt que de laisser croire à une faute de frappe. */
 const KNOWN_UNSUPPORTED = new Set(["cot", "sec", "csc", "min", "max", "gcd", "lcm", "mod"]);
+
+/** Les opérateurs de même précédence que `*` : `2+10%3` vaut `2+(10%3)`. */
+const MULTIPLICATIVE = new Set(["*", "/", "%"]);
 
 export function functionNames(): MathFunctionName[] {
   return Object.values(FUNCTIONS);
@@ -113,8 +121,16 @@ class Parser {
     let left = this.parseUnary();
     for (;;) {
       const token = this.peek();
-      if (token.type === "operator" && (token.value === "*" || token.value === "/")) {
+      if (token.type === "operator" && MULTIPLICATIVE.has(token.value)) {
         this.next();
+        // Rien à droite — « 5 % » ou « (5%) ». Le dire clairement vaut mieux
+        // que « Expression invalide près de «  » » et, surtout, que
+        // « Parenthèse fermante sans parenthèse ouvrante », qui enverrait
+        // l'utilisateur chercher une erreur là où il n'y en a pas.
+        const next = this.peek();
+        if (next.type === "end" || next.type === "rparen") {
+          throw new MathError("SYNTAX", `« ${token.raw} » attend une valeur à sa droite.`);
+        }
         const right = this.parseUnary();
         left = { kind: "binary", operator: token.value as BinaryOperator, left, right };
         continue;
@@ -129,10 +145,13 @@ class Parser {
     }
   }
 
-  /** Un jeton peut-il débuter un opérande ? */
+  /** Un jeton peut-il débuter un opérande ? `√` oui : « 2√9 » vaut 6. */
   private startsPrimary(token: Token): boolean {
     return (
-      token.type === "number" || token.type === "identifier" || token.type === "lparen"
+      token.type === "number" ||
+      token.type === "identifier" ||
+      token.type === "lparen" ||
+      (token.type === "operator" && token.value === "√")
     );
   }
 
@@ -142,6 +161,18 @@ class Parser {
       this.next();
       const operand = this.parseUnary();
       return { kind: "unary", operator: token.value as UnaryOperator, operand };
+    }
+    // « √ » est l'écriture préfixée de `sqrt`. Le nœud produit est un APPEL,
+    // pas un opérateur unaire : les évaluateurs n'ont donc rien à apprendre de
+    // ce signe, et `√` hérite de tout ce que `sqrt` sait déjà faire (forme
+    // exacte d'un carré parfait, refus d'un radicande négatif).
+    if (token.type === "operator" && token.value === "√") {
+      this.next();
+      const next = this.peek();
+      if (next.type === "end" || next.type === "rparen") {
+        throw new MathError("SYNTAX", "« √ » attend un nombre ou une parenthèse.");
+      }
+      return { kind: "call", name: "sqrt", argument: this.parseUnary() };
     }
     return this.parsePower();
   }

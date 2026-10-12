@@ -154,6 +154,11 @@ function toPolynomial(node: MathNode): Polynomial | null {
       if (node.operator === "-") return addPolynomials(left, negatePolynomial(right));
       if (node.operator === "*") return multiplyPolynomials(left, right);
 
+      // Modulo : hors du domaine polynomial. Ce test doit précéder le repli
+      // ci-dessous, qui traite TOUT le reste comme une division — sans lui,
+      // « x % 2 = 0 » serait silencieusement résolu comme « x/2 = 0 ».
+      if (node.operator === "%") return null;
+
       // Division : uniquement par une constante non nulle.
       if (degreeOf(right) !== 0) return null;
       if (isZero(right[0])) {
