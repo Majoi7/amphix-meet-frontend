@@ -1,0 +1,335 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Page 404 — recettes de la page.
+
+   Même contrat que `profile.css`, `prejoin.css` et `home.css` : les couleurs
+   viennent de `src/styles/theme.css` (jetons `--app-*`), et la page suit donc
+   la bascule clair/sombre comme les autres. Aucun nouveau design system n'est
+   introduit : les deux boutons reprennent la recette de `.hm-btn-primary` et
+   de `.dash-btn-secondary`, et le titre la police d'affichage déjà utilisée
+   partout, « Bricolage Grotesque ».
+
+   Les classes portent le préfixe `nf-` pour ne croiser ni `hm-*`, ni `pf-*`,
+   ni `pj-*`, ni `dash-*`, ni `app-*`, ni `meet-*`.
+
+   La page importe `theme.css` AVANT ce fichier (`NotFound.tsx`).
+
+   ELLE SE DÉFEND CONTRE `landingPage.css`, qui pose `:root`, `html` et `a` au
+   niveau global et se retrouve chargé sur TOUTES les routes, y compris
+   celle-ci. `dashboard.css` s'en protège déjà de la même façon pour
+   l'administration : on repose `box-sizing`, et on reprend la décoration des
+   liens par une règle locale, plutôt que de dépendre de ce que fait ce fichier
+   aujourd'hui.
+
+   On ne repose PAS leur couleur. `landingPage.css` écrit `a { color: inherit }`
+   en (0,0,1) : inoffensif, les recettes de boutons ci-dessous (0,1,0)
+   l'emportent. Mais la même déclaration écrite ici en `.nf-root a` (0,1,1)
+   écraserait le libellé blanc du bouton principal. C'est pour cela qu'il n'y a
+   pas de remise à zéro de la couleur dans ce fichier.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.nf-root {
+    position: relative;
+    isolation: isolate;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* `safe center` : sur un écran court, le contenu est plus haut que la
+       fenêtre ; sans le mot-clé `safe`, le centrage le ferait dépasser par le
+       haut, hors d'atteinte, sans barre de défilement. Même parade que
+       `.pj-root`. `center` reste écrit au-dessus, pour les navigateurs qui
+       ignorent `safe`. */
+    justify-content: center;
+    justify-content: safe center;
+    overflow-x: hidden;
+    overflow-y: auto;
+    /* Les marges sont déclarées deux fois, comme `justify-content` juste
+       au-dessus : la première ligne est le repli, la seconde la version qui
+       tient compte des encoches. Sans ce repli, un navigateur qui ne connaît
+       pas `env()` jetterait la déclaration ENTIÈRE — pas seulement le
+       `max()` — et la page se retrouverait sans aucune marge intérieure. */
+    padding: 24px 16px 32px;
+    padding: max(24px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+        calc(32px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+    background: var(--app-bg);
+    color: var(--app-text);
+    text-align: center;
+    font-family: Figtree, system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.nf-root *,
+.nf-root *::before,
+.nf-root *::after {
+    box-sizing: border-box;
+}
+
+.nf-root a {
+    text-decoration: none;
+}
+
+
+/* ---------- Halo ----------
+   Le même halo indigo que l'accueil, le profil et le pré-join : un seul
+   dégradé, très doux, en `position: fixed` — il ne réclame aucune place dans
+   la mise en page. */
+
+.nf-glow {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(ellipse 760px 460px at 50% -120px, var(--app-glow), transparent 68%);
+}
+
+
+/* ---------- Le renard ----------
+
+   Il vient de `FoxSVG` — la marque d'Amphix, pas un dessin nouveau. Trois
+   couches, une seule transformation chacune : c'est ce qui permet au suivi du
+   curseur, au flottement et au saut de cohabiter sans se marcher dessus.
+
+     1. `.nf-fox`      → suivi du curseur (transform posé en JavaScript)
+     2. `.nf-fox-bob`  → flottement permanent
+     3. `.nf-fox-jump` → le saut, à la demande
+
+   Le renard est décoratif : `aria-hidden` côté composant, et
+   `pointer-events: none` ici — il ne peut jamais intercepter un clic destiné
+   aux boutons. */
+
+.nf-fox {
+    display: block;
+    width: 132px;
+    height: 112px;
+    margin-bottom: 4px;
+    pointer-events: none;
+    will-change: transform;
+}
+
+.nf-fox-bob,
+.nf-fox-jump {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.nf-fox-bob {
+    transform-origin: 50% 90%;
+    animation: nf-bob 2.6s ease-in-out infinite;
+}
+
+/* Le saut pivote aux pieds : c'est ce qui fait une flexion, pas une rotation. */
+.nf-fox-jump {
+    transform-origin: 50% 100%;
+}
+
+.nf-fox-jump.is-hopping {
+    animation: nf-hop 620ms cubic-bezier(.3, .8, .35, 1);
+}
+
+.nf-fox svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* La queue déborde du cadre quand elle remue : elle doit rester visible,
+       exactement comme sur la landing (`.fx svg`). */
+    overflow: visible;
+}
+
+/* `transform-origin` en pourcentage sur un groupe SVG se résout dans le
+   viewBox, pas dans la boîte du tracé : la valeur ci-dessous est donc celle de
+   la landing, dans le même repère, et place le pivot à la naissance de la
+   queue. */
+.nf-fox .tail {
+    transform-origin: 20% 70%;
+    animation: nf-wag 1.8s ease-in-out infinite;
+}
+
+.nf-fox .pu {
+    animation: nf-look 4s ease-in-out infinite;
+}
+
+
+/* ---------- Le renard en thème sombre ----------
+
+   `FoxSVG` se colore avec `--ind`, que `landingPage.css` définit… mais
+   SEULEMENT sous `:root[data-theme="dark"]` et `prefers-color-scheme`. Or,
+   dans cette application, `data-theme` est posé sur `.app-theme` et JAMAIS sur
+   `<html>` : la règle `:root[data-theme]` ne s'applique donc jamais, et le
+   renard suivrait la préférence du SYSTÈME au lieu de celle de l'utilisateur —
+   indigo foncé sur fond sombre. On redéfinit le jeton ici, sur le même attribut
+   que le reste de la page. Seul `--ind` est repris : c'est le seul que `FoxSVG`
+   consomme, et déclarer `--ind2` sans l'employer ne serait que du code mort. */
+
+.nf-root[data-theme="dark"] {
+    --ind: #8f84ff;
+}
+
+
+/* ---------- Textes ---------- */
+
+.nf-code {
+    margin: 0;
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-size: clamp(56px, 15vw, 92px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--app-accent);
+}
+
+.nf-title {
+    margin: 10px 0 0;
+    font-size: clamp(21px, 4.2vw, 28px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--app-text);
+    text-wrap: balance;
+}
+
+.nf-text {
+    max-width: 46ch;
+    margin: 12px 0 0;
+    font-size: 15.5px;
+    line-height: 1.62;
+    color: var(--app-text-muted);
+}
+
+
+/* ---------- Actions ----------
+   Deux boutons, recette de `.hm-btn-primary` (dégradé `--app-btn-1` →
+   `--app-btn-2`) et de `.dash-btn-secondary` (surface et bordure). Tous deux
+   mènent quelque part : ce sont des `<Link>` React Router, jamais des `#`. */
+
+.nf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 28px;
+}
+
+.nf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 24px;
+    border: 1.5px solid transparent;
+    border-radius: 999px;
+    font: 700 15px "Bricolage Grotesque", system-ui, sans-serif;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .2s, border-color .2s, color .2s, transform .2s, box-shadow .2s, opacity .2s;
+}
+
+/* L'état d'attente du second bouton, pendant la restauration de session. */
+.nf-btn:disabled {
+    opacity: .6;
+    cursor: progress;
+}
+
+.nf-btn-primary {
+    background: linear-gradient(135deg, var(--app-btn-1), var(--app-btn-2));
+    color: var(--app-on-accent);
+    box-shadow: 0 14px 30px -14px var(--app-accent);
+}
+
+.nf-btn-secondary {
+    background: var(--app-surface);
+    border-color: var(--app-border-strong);
+    color: var(--app-text);
+}
+
+
+/* ---------- Animations ---------- */
+
+@keyframes nf-bob {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+@keyframes nf-wag {
+    0%,
+    100% {
+        transform: rotate(-6deg);
+    }
+    50% {
+        transform: rotate(6deg);
+    }
+}
+
+/* Le regard : les deux pupilles se déplacent ensemble, dans leur orbite. */
+@keyframes nf-look {
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    30% {
+        transform: translateX(-7px);
+    }
+    65% {
+        transform: translateX(7px);
+    }
+}
+
+/* Le saut : une flexion, une poussée, une retombée. 620 ms, joué une fois. */
+@keyframes nf-hop {
+    0% {
+        transform: translateY(0) scale(1, 1);
+    }
+    18% {
+        transform: translateY(5px) scale(1.07, .91);
+    }
+    46% {
+        transform: translateY(-15px) scale(.96, 1.06);
+    }
+    76% {
+        transform: translateY(0) scale(1.03, .97);
+    }
+    100% {
+        transform: translateY(0) scale(1, 1);
+    }
+}
+
+
+/* ---------- Survols (appareils avec souris uniquement) ---------- */
+
+@media (hover: hover) {
+    .nf-btn-primary:not(:disabled):hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 38px -14px var(--app-accent);
+    }
+    .nf-btn-secondary:not(:disabled):hover {
+        background: var(--app-surface-2);
+        border-color: var(--app-accent);
+    }
+}
+
+
+/* ---------- Mouvement réduit ----------
+   Le suivi du curseur n'est pas neutralisé ici : il n'est jamais démarré (voir
+   `FoxMascot.tsx`). Ce bloc s'occupe du reste — flottement, queue, regard,
+   saut — et il l'emporte sur les animations déclarées plus haut. Le renard
+   reste alors parfaitement immobile, mais lisible. */
+
+@media (prefers-reduced-motion: reduce) {
+    .nf-fox {
+        will-change: auto;
+    }
+    .nf-fox,
+    .nf-fox *,
+    .nf-fox *::before,
+    .nf-fox *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}

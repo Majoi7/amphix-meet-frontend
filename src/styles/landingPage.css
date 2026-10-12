@@ -368,6 +368,65 @@ nav {
     object-fit: cover
 }
 
+/* Le lecteur de secours et l'état de repli prennent exactement la place de la
+   vidéo locale : même largeur, mêmes proportions. Les coins arrondis sont
+   acquis sans rien ajouter — `.vid` les découpe par son `overflow: hidden`,
+   y compris à 16px sur petit écran.
+
+   Les couleurs de ce bloc sont FIXES et non des jetons : `.vid` est sombre
+   dans les deux thèmes (`background: #0d0a2b`), or `--ind` suit le thème et
+   deviendrait illisible sur ce fond en thème clair. */
+
+.vid iframe {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16/9;
+    border: 0;
+    background: #0d0a2b
+}
+
+.vid-fallback {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    aspect-ratio: 16/9;
+    /* Sur un écran très étroit, les proportions 16/9 deviennent plus courtes
+       que le texte et le bouton réunis — et `.vid` les rognerait. `min-content`
+       laisse le bloc grandir plutôt que de tronquer le message de secours. */
+    min-height: min-content;
+    padding: 24px;
+    text-align: center;
+    background: #0d0a2b
+}
+
+.vid-fallback p {
+    margin: 0;
+    font-size: 15px;
+    color: rgba(255, 255, 255, .72)
+}
+
+.vid-fallback a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 22px;
+    border-radius: 999px;
+    background: #fff;
+    color: #0d0a2b;
+    font-size: 15px;
+    font-weight: 700;
+    transition: background .2s, transform .2s
+}
+
+@media (hover: hover) {
+    .vid-fallback a:hover {
+        background: #e6e2fb;
+        transform: translateY(-2px)
+    }
+}
+
 
 /* Sections */
 

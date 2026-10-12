@@ -14,6 +14,7 @@ import { EmbedRoomPage } from "./pages/EmbedRoom";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Profile } from "./pages/Profile";
+import { NotFound } from "./pages/NotFound";
 import { MathSpace } from "./pages/MathSpace";
 import { AdminLayout } from "./pages/admin/AdminLayout";
 import { RequireRole } from "./pages/admin/RequireRole";
@@ -124,6 +125,23 @@ function AppRoutes() {
                   path="/settings"
                   element={<Navigate to="/dashboard/settings" replace />}
                 />
+
+                {/* Fourre-tout — DOIT RESTER EN DERNIER. React Router classe
+                    `*` en tout dernier recours : aucune route déclarée
+                    ci-dessus ne peut donc être interceptée, y compris les
+                    routes protégées et `/room/:roomId` (une salle inexistante
+                    reste traitée par `RoomPage`, pas ici).
+
+                    Volontairement HORS de `RequireAuth` : une personne
+                    déconnectée qui suit un lien mort doit voir la 404, pas
+                    être renvoyée à l'écran de connexion. C'est aussi ce qui
+                    lui donne accès à `useAuth` pour choisir la destination de
+                    son second bouton.
+
+                    Effet de bord assumé et validé : `/settings` redirige vers
+                    `/dashboard/settings`, qui n'existe pas. Ce chemin rendait
+                    une page blanche ; il rend désormais la 404. */}
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </AuthProvider>
           }

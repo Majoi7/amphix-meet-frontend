@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { createMeeting, joinMeeting, type CreateMeetingResponse } from "../lib/meetingApi";
+import { PresentationVideo } from "../components/PresentationVideo";
 import "../styles/landingPage.css";
 
 const NAV_LINKS = [
@@ -19,7 +20,10 @@ const delay = (d: string) => ({ "--d": d }) as CSSProperties;
 
 // Défini hors du composant : sinon il serait recréé à chaque rendu (toast, scroll…)
 // et les animations de la mascotte repartiraient de zéro.
-function FoxSVG() {
+// Exporté pour la page 404, qui réutilise la marque telle quelle
+// (`components/FoxMascot.tsx`) : le balisage ci-dessous n'est pas modifié, et
+// la landing rend donc exactement comme avant.
+export function FoxSVG() {
   return (
     <svg viewBox="70 170 1070 900" aria-hidden="true">
       <g fill="currentColor" style={{ color: "var(--ind)" }}>
@@ -406,10 +410,7 @@ export function LandingPage() {
 
           <div className="video-wrap rv" style={delay(".24s")}>
             <div className="vid" id="vid" ref={vidRef}>
-              <video controls playsInline preload="metadata" aria-label="Vidéo de présentation d’Amphix Meet">
-                <source src="/video.mp4" type="video/mp4" />
-                Votre navigateur ne prend pas en charge la lecture vidéo.
-              </video>
+              <PresentationVideo />
             </div>
           </div>
         </header>
