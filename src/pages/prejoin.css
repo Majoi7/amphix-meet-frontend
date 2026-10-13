@@ -1,29 +1,34 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Écran de pré-jonction.
+
+   Ce fichier ne vise QUE `.pj-*` et `.control-btn`. Rien ici n'a de portée
+   globale : les jetons `--app-*` sont LUS, jamais redéfinis.
+
+   FOND BLANC — TOUJOURS
+
+   La page impose `#ffffff` en dur, et `PreJoin.tsx` ne pose plus l'attribut
+   `data-theme` sur sa racine. Les deux vont ensemble : sans cet attribut,
+   `.app-theme[data-theme="dark"]` (`theme.css`, spécificité 0,2,0) ne peut
+   pas s'appliquer, donc les jetons gardent leurs valeurs claires même si
+   l'application est en thème sombre. La garantie est STRUCTURELLE, et non une
+   surenchère de spécificité qui dépendrait de l'ordre de chargement des
+   feuilles.
+
+   Contrepartie assumée : cette page n'est plus thématisée. C'est le prix d'un
+   fond blanc quel que soit le réglage, et c'est un choix, pas un oubli.
+   ══════════════════════════════════════════════════════════════════════ */
+
 .pj-root {
-    position: relative;
-    isolation: isolate;
     min-height: 100vh;
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    /* `safe center` : le centrage cède quand le contenu est plus haut que la
-       fenêtre, au lieu de le laisser dépasser par le HAUT — c'était le cas
-       ici, avec `overflow: hidden` : sur un écran court (téléphone en
-       paysage, fenêtre basse), le haut de l'aperçu devenait inatteignable,
-       sans même une barre de défilement. `justify-content: center` reste
-       écrit au-dessus, pour les navigateurs qui ignorent `safe`. */
-    justify-content: center;
-    justify-content: safe center;
-    gap: 32px;
-    /* Même raison pour le débordement : on ne coupe plus, on laisse défiler
-       verticalement. L'horizontal reste coupé — rien ne doit déborder en
-       largeur, et le halo, en `position: absolute`, élargirait sinon la zone
-       défilante. */
-    overflow: hidden;
+    /* Horizontal coupé — rien ne doit déborder en largeur. Vertical rendu à la
+       page : sur un écran court, le haut de l'aperçu doit rester atteignable,
+       quitte à faire défiler. */
     overflow-x: hidden;
     overflow-y: auto;
-    padding: 32px 16px;
-    background: var(--app-bg);
+    background: #ffffff;
     color: var(--app-text);
     font-family: Figtree, system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent;
@@ -35,24 +40,208 @@
     box-sizing: border-box;
 }
 
-.pj-root p {
+.pj-root p,
+.pj-root h1 {
     margin: 0;
 }
 
-.pj-glow {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background: radial-gradient(ellipse 900px 520px at 50% -120px, var(--app-glow), transparent 68%);
+/* ---------- En-tête ---------- */
+
+.pj-header {
+    flex: none;
+    /* Pas de `position: sticky` : `.pj-root` porte `overflow-x: hidden`, et un
+       ancêtre qui coupe le débordement neutralise l'ancrage collant. Un
+       en-tête qui défile vaut mieux qu'un en-tête qui disparaît. */
+    background: #ffffff;
+    border-bottom: 1px solid var(--app-border);
+    padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pj-header-in {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 12px max(20px, env(safe-area-inset-right, 0px)) 12px max(20px, env(safe-area-inset-left, 0px));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.pj-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.pj-brand svg {
+    width: 36px;
+    height: 31px;
+    flex: none;
+}
+
+.pj-brand-name {
+    font: 800 20px "Bricolage Grotesque", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+}
+
+.pj-account {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 40px;
+    flex: none;
+    padding: 0 14px 0 6px;
+    border-radius: 999px;
+    border: 1.5px solid var(--app-border);
+    background: var(--app-surface);
+}
+
+.pj-avatar {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.pj-avatar-fb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    color: #14103a;
+}
+
+/* Le nom du compte n'apparaît qu'à partir de la tablette. À 320 px, la
+   pastille complète poussait la marque hors de l'écran ; l'avatar seul suffit
+   à dire qui est connecté. Même arbitrage que `.hm-chip-name` (home.css). */
+.pj-account-name {
+    display: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--app-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------- Corps ---------- */
+
+.pj-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* `safe center` : sur un écran plus court que le contenu, le centrage cède
+       au lieu de pousser le haut de l'aperçu hors de la zone atteignable.
+       Même parade que l'ancienne version de cette page. */
+    justify-content: center;
+    justify-content: safe center;
+    gap: 28px;
+    padding: 24px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
 
 .pj-preview {
     width: 100%;
-    max-width: 448px;
+    max-width: 640px;
     animation: pj-in .6s cubic-bezier(.2, .8, .2, 1) both;
 }
 
+/* Panneau SANS carte : ni bordure, ni ombre, ni fond propre. Le brief demande
+   un panneau blanc sans bordure lourde — et comme la page est déjà blanche, un
+   cadre n'ajouterait qu'une boîte inutile autour de deux lignes de texte. */
+.pj-panel {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+    animation: pj-in .6s .08s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+/* La famille vient de `.app-theme h1` (theme.css, Bricolage Grotesque) : le
+   titre d'une page est un titre, il suit le design system comme sur l'accueil
+   et le profil. Seule la taille est décidée ici. */
+.pj-title {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--app-text);
+}
+
+.pj-sub {
+    font-size: 14px;
+    color: var(--app-text-muted);
+}
+
+.pj-code {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 8px;
+    background: var(--app-surface-2);
+    color: var(--app-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13.5px;
+    word-break: break-all;
+}
+
+.pj-error {
+    /* `stretch` : le message occupe toute la largeur du panneau des deux côtés
+       du point de rupture, y compris quand le panneau passe en alignement à
+       gauche sur bureau. */
+    align-self: stretch;
+    padding: 10px 14px;
+    text-align: center;
+    border-radius: 14px;
+    border: 1.5px solid var(--app-red);
+    background: var(--app-red-soft);
+    color: var(--app-red);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.pj-join {
+    width: 100%;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--app-btn-1), var(--app-btn-2));
+    color: var(--app-on-accent);
+    font: 700 16px Figtree, system-ui, sans-serif;
+    box-shadow: 0 14px 30px -14px var(--app-accent);
+    transition: transform .2s, box-shadow .2s, opacity .2s;
+}
+
+.pj-join:active:not(:disabled) {
+    transform: scale(.98);
+}
+
+.pj-join:disabled {
+    opacity: .6;
+    cursor: progress;
+}
+
+.pj-spin {
+    animation: pj-sp .8s linear infinite;
+}
+
+@media (hover: hover) {
+    .pj-join:not(:disabled):hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 38px -14px var(--app-accent);
+    }
+}
 
 /* ---------- Commandes de l'aperçu caméra ----------
 
@@ -117,142 +306,6 @@
     }
 }
 
-.pj-card {
-    width: 100%;
-    max-width: 384px;
-    padding: 28px;
-    border-radius: 28px;
-    border: 1.5px solid var(--app-border);
-    background: var(--app-surface);
-    box-shadow: var(--app-shadow-lg);
-    animation: pj-in .6s .08s cubic-bezier(.2, .8, .2, 1) both;
-}
-
-.pj-head {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 22px;
-}
-
-.pj-ico {
-    width: 42px;
-    height: 42px;
-    flex: none;
-    border-radius: 14px;
-    display: grid;
-    place-items: center;
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
-}
-
-.pj-ask {
-    font-size: 15px;
-    color: var(--app-text-muted);
-    line-height: 1.4;
-}
-
-.pj-code {
-    display: inline-block;
-    padding: 1px 8px;
-    border-radius: 8px;
-    background: var(--app-surface-2);
-    color: var(--app-text);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 13.5px;
-    word-break: break-all;
-}
-
-.pj-user {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 14px;
-    margin-bottom: 20px;
-    border-radius: 18px;
-    background: var(--app-surface-2);
-}
-
-.pj-avatar {
-    width: 36px;
-    height: 36px;
-    flex: none;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-.pj-avatar-fb {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 800;
-    color: #14103a;
-}
-
-.pj-user-text {
-    min-width: 0;
-    font-size: 14px;
-    color: var(--app-text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.pj-user-text strong {
-    color: var(--app-text);
-    font-weight: 700;
-}
-
-.pj-join {
-    width: 100%;
-    min-height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    border: 0;
-    border-radius: 999px;
-    cursor: pointer;
-    background: linear-gradient(135deg, var(--app-btn-1), var(--app-btn-2));
-    color: var(--app-on-accent);
-    font: 700 16px "Bricolage Grotesque", system-ui, sans-serif;
-    box-shadow: 0 14px 30px -14px var(--app-accent);
-    transition: transform .2s, box-shadow .2s, opacity .2s;
-}
-
-.pj-join:active:not(:disabled) {
-    transform: scale(.98);
-}
-
-.pj-join:disabled {
-    opacity: .6;
-    cursor: progress;
-}
-
-.pj-spin {
-    animation: pj-sp .8s linear infinite;
-}
-
-.pj-error {
-    margin-top: 16px;
-    padding: 10px 14px;
-    text-align: center;
-    border-radius: 14px;
-    border: 1.5px solid var(--app-red);
-    background: var(--app-red-soft);
-    color: var(--app-red);
-    font-size: 14px;
-    font-weight: 500;
-}
-
-@media (hover: hover) {
-    .pj-join:not(:disabled):hover {
-        transform: translateY(-2px);
-        box-shadow: 0 20px 38px -14px var(--app-accent);
-    }
-}
-
 @keyframes pj-in {
     from {
         opacity: 0;
@@ -266,18 +319,64 @@
     }
 }
 
-@media (min-width: 1024px) {
-    .pj-root {
-        flex-direction: row;
-        gap: 80px;
-        padding: 32px 48px;
-    }
+/* ---------- Points de rupture ----------
+
+   TROIS régimes, et non deux. Le brief demande explicitement que la tablette
+   ne reçoive ni les règles du téléphone ni celles du bureau : à 768 px, une
+   colonne unique avec un aperçu large est la bonne réponse — deux colonnes y
+   écraseraient l'aperçu, et la mise en page téléphone y laisserait une page
+   étroite au milieu d'un grand écran. */
+
+/* Tablette */
+@media (min-width: 640px) {
     .pj-preview {
-        max-width: 512px;
+        max-width: 560px;
     }
-    .pj-card {
-        max-width: 448px;
-        padding: 36px;
+    .pj-account-name {
+        display: block;
+    }
+    .pj-title {
+        font-size: 34px;
+    }
+}
+
+@media (min-width: 768px) {
+    .pj-preview {
+        max-width: 600px;
+    }
+}
+
+/* Bureau : deux colonnes. Le panneau est centré verticalement par
+   `align-items: center` de `.pj-main` — pas par une marge calculée, qui
+   serait fausse dès que l'aperçu change de proportions. */
+@media (min-width: 1024px) {
+    .pj-main {
+        flex-direction: row;
+        align-items: center;
+        gap: 56px;
+        padding: 32px max(48px, env(safe-area-inset-right, 0px)) calc(32px + env(safe-area-inset-bottom, 0px)) max(48px, env(safe-area-inset-left, 0px));
+    }
+    /* `min-width: 0` autorise l'aperçu à rétrécir dans la rangée : sans lui,
+       un élément flex refuse de descendre sous la largeur de son contenu et
+       pousserait le panneau hors de l'écran à 1024 px. */
+    .pj-preview {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: 620px;
+    }
+    .pj-panel {
+        flex: 0 0 360px;
+        align-items: flex-start;
+        text-align: left;
+    }
+    /* Le bouton cesse d'occuper toute la largeur : il se dimensionne sur son
+       libellé, comme sur la référence, au lieu de s'étirer sur 360 px. */
+    .pj-join {
+        width: auto;
+        padding: 0 32px;
+    }
+    .pj-title {
+        font-size: 36px;
     }
 }
 
